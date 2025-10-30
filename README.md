@@ -16,11 +16,14 @@ Let x_0 ∼ p_data be an image, and let t ∈ {1,…,T}. We choose a monotonical
 Forward (noising) process variants:
 
 - Markov (baseline, DDPM):
-  - q(x_t | x_{t−1}) = Normal(√α_t x_{t−1}, (1−α_t) I), so that q(x_t | x_0) = Normal(√γ_t x_0, (1−γ_t) I) with γ_t = ∏_{s=1}^t α_s.
+  - q(x_t | x_{t−1}) = Normal(√α_t x_{t−1}, (1−α_t) I), forming a Markov chain where x_t only depends on x_{t-1}.
+  - The marginal is q(x_t | x_0) = Normal(√γ_t x_0, (1−γ_t) I) with γ_t = ∏_{s=1}^t α_s.
 
-- Non‑Markov (parallelized, conditionally independent given x_0):
-  - q(x_t | x_{0:t−1}) = q(x_t | x_0) = Normal(√γ_t x_0, (1−γ_t) I), for all t ∈ [1, T].
-  - Each x_t can be sampled in parallel: x_t = √γ_t x_0 + √(1−γ_t) ε_t, ε_t ∼ Normal(0, I).
+- Non‑Markov (this work):
+  - **Fixed, non-Markovian** inference process: q(x_t | x_{0:t−1}) = q(x_t | x_0) = Normal(√γ_t x_0, (1−γ_t) I), ∀ t ∈ [1, T].
+  - Note: x_t depends on the entire history x_{0:t-1} through x_0, making it non-Markovian (not just dependent on x_{t-1}).
+  - **Key property**: Each x_t is conditionally independent given x_0, enabling parallel sampling.
+  - Implementation: x_t = √γ_t x_0 + √(1−γ_t) ε_t, where ε_t ∼ Normal(0, I) are independent across t.
 
 Reverse (generative) models:
 
@@ -41,15 +44,27 @@ Notes:
 ## 2) From Markov to non‑Markov training losses
 
 - Markov baseline (DDPM‑style):
-  - Sample t ∼ Uniform({1,…,T}), ε ∼ Normal(0,I), form x_t = √γ_t x_0 + √(1−γ_t) ε.
-  - Minimize w_t · ||ε − ε_θ(x_t, t)||² with schedule‑dependent weighting w_t.
+  - **Forward**: Sequential Markov chain q(x_t | x_{t-1}).
+  - **Training**: Sample t ∼ Uniform({1,…,T}), ε ∼ Normal(0,I), form x_t = √γ_t x_0 + √(1−γ_t) ε.
+  - **Loss**: Minimize w_t · ||ε − ε_θ(x_t, t)||² with schedule‑dependent weighting w_t.
+  - **Reverse**: Model p_θ(x_{t-1} | x_t) uses only current state.
 
 - Non‑Markov with suffix context:
-  - For each minibatch, draw independent {ε_s} and construct {x_s}_{s=t}^T using x_s = √γ_s x_0 + √(1−γ_s) ε_s (parallelizable across s).
-  - Encode the future suffix c_t = Enc(x_{t:T}, t). Options: Transformer/Conv1D over time; or signature/log‑signature (Section 3).
-  - Minimize w_t · ||ε_t − ε_θ(x_t, t, c_t)||², plus standard prior/likelihood terms.
+  - **Forward**: Non-Markovian process q(x_t | x_{0:t-1}) = q(x_t | x_0), where each x_t is conditionally independent given x_0.
+  - **Training**: For each minibatch, draw independent {ε_s}_{s=t}^{t+k} and construct the suffix {x_s}_{s=t}^{t+k} using:
+    ```
+    x_s = √γ_s x_0 + √(1−γ_s) ε_s,  for s ∈ {t, t+1, ..., t+k}
+    ```
+    This is parallelizable across timesteps s since they are independent given x_0.
+  - **Encoding**: Encode the future suffix c_t = Enc(x_{t:t+k}, {t, t+1, ..., t+k}). Options: Transformer/Conv1D over time; or signature/log‑signature (Section 3).
+  - **Loss**: Minimize w_t · ||ε_t − ε_θ(x_t, t, c_t)||², plus standard prior/likelihood terms.
+  - **Reverse**: Model p_θ(x_{t-1} | x_{t:T}) uses suffix context for improved denoising.
 
-This keeps the computational profile close to DDPM while allowing non‑Markov reverse conditioning on the entire suffix.
+**Key insight**: While the forward marginals q(x_t | x_0) look identical to DDPM, the underlying meaning is different:
+- DDPM: x_t is the result of a Markov chain through x_1, ..., x_{t-1}
+- Non-Markov: x_t is directly sampled from x_0, making {x_t} conditionally independent given x_0
+
+This allows efficient parallel suffix construction during training while enabling non-Markov reverse conditioning.
 
 
 ## 3) Signature/log‑signature encoding of x_{t:T}

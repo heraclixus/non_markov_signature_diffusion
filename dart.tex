@@ -1,0 +1,29 @@
+Therefore, it is critical to design a \textbf{fixed} and \textbf{non-Markovian}\footnote{The term non-Markovian refers to $\vx_t$ is not only related to the previous step $\vx_{t-1}$.} inference process $q(\vx_t|\vx_{0:t-1})$ to sample the noisy sequences $\vx_{1:T}\sim \vx_0$.
+The simplest approach is to perform an \textit{independent} noising process:
+\begin{equation}
+    q(\vx_t|\vx_{0:t-1}) = q(\vx_t|\vx_0) = \mathcal{N}(\vx_t; \sqrt{\gamma_t} \vx_0, (1-\gamma_t)\mathbf{I}), \;\; \forall t \in [1, T],
+    \label{eq.n}
+\end{equation}
+where $\gamma_t$ represents the non-Markovian noise schedule. 
+Note that, while \cref{eq.n} may look close to the marginal distribution of the original diffusion models (\cref{eq.DDPM_forward}), the underlying meaning is different as $\vx_t$ is conditionally independent given $\vx_0$.
+
+
+
+\paragraph{\underline{D}enoising \underline{A}uto\underline{R}egressive \underline{T}ransformer (DART)}
+We propose DART -- a Transformer-based generative model that implements non-Markovian diffusion with an independent noising process (see \cref{fig:dart_pipeline}). 
+First, following DiT~\citep{peebles2022scalable}, we represent each image by first extracting the latent map with a pretrained VAE~\citep{rombach2021highresolution}, patchify, and flatten the map into a sequence of continuous tokens $\vx_t\in \mathbb{R}^{K\times C}$, where $K$ is the length, and $C$ is the channel dimension. When considering multiple noise levels,  we concat tokens along the length dimension. 
+Then, DART models the generation as $p_\theta(\vx_{t-1}|\vx_{t:T}) = \mathcal{N}\left(\vx_{t-1}; \sqrt{\gamma_{t-1}}\vx_\theta(\vx_{t:T}), (1-\gamma_{t-1})\mathbf{I}\right)$, where $\vx_\theta(.)$ is a Transformer network that takes in the concatenated sequence $\vx_{t:T} \in \mathbb{R}^{K(T-t)\times C}$, and predicts the ``mean'' of the next noisy image. By combining with \cref{eq.n}, we simplify \cref{eq:nomad} as:
+\begin{equation}
+    \min \mathcal{L}^{\textrm{DART}}_\theta = \mathbb{E}_{\vx_{1:T}\sim q(\vx_0)}\left[
+        \sum_{t=1}^T\omega_t\cdot\|\vx_\theta(\vx_{t:T}) - \vx_0\|^2_2
+    \right],
+    \label{eq.dart}
+\end{equation}
+where we define $\omega_t = \frac{\gamma_{t-1}}{1-\gamma_{t-1}} \tilde{\omega}_t$ to simplify the notation. Similar to standard AR models, training of $T$ denoising steps is in parallel, where computations across different steps are shared. A chunk-based causal mask is used to maintain the autoregressive structure
+
+
+It is evident from \cref{eq.dart} that the objective is similar to the original diffusion objective (\cref{eq.DM_loss}), demonstrating that DART can be trained as robustly as standard diffusion models. Additionally, by leveraging the diffusion trajectory within an autoregressive framework, DART allows us to incorporate the proven design principles of large language models~\citep{gpt3, dubey2024llama}.
+Furthermore, \cref{prop.1} indicates that we can select $\omega_t$ according to its associated diffusion process. For instance, with SNR weighting~\citep{ho2020denoising}, $\omega_t$ can be defined as $\omega_t = \sum_{\tau=t}^T \frac{\gamma_\tau}{1-\gamma_\tau}$.
+
+    
+Sampling from DART is straightforward: we simply predict the mean $\vx_\theta(\vx_{t:T})$, add Gaussian noise to obtain the next step $\hat{\vx}_{t-1}$, and feed that to the following iteration. Unlike diffusion models, no complex solvers are needed. Similar to diffusion models, classifier-free guidance~\cite[CFG,][]{ho2021classifier} is applied to the prediction of $\vx_\theta$ for improved visual quality.
