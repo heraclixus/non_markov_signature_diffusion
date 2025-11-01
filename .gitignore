@@ -46,7 +46,6 @@ logs/
 
 # Experiments (keep structure, ignore contents)
 experiments/*/checkpoints/*.pt
-experiments/*/samples/*.png
 experiments/*/logs/
 
 # But keep directory structure
