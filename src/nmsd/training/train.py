@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 from nmsd.diffusion.schedulers import build_schedule
 from nmsd.diffusion.losses import ddpm_simple_loss
-from nmsd.data.datasets import get_mnist_dataloaders
+from nmsd.data.datasets import get_dataloaders
 from nmsd.models.unet import UNet
 from nmsd.diffusion.sampler import ddim_sample_loop
 from nmsd.utils.logger import LossLogger, MemoryProfiler
@@ -59,7 +59,8 @@ def train(cfg: Dict):
     set_seed(int(cfg.get("seed", 42)))
 
     # Data
-    train_loader, _ = get_mnist_dataloaders(
+    train_loader, _ = get_dataloaders(
+        dataset_name=cfg["data"]["dataset"],
         root=cfg["data"]["root"],
         batch_size=int(cfg["data"]["batch_size"]),
         num_workers=int(cfg["data"]["num_workers"]),

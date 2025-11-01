@@ -88,10 +88,12 @@ Benefits to test empirically:
 
 ## 4) Datasets and metrics (simple, image)
 
-Recommended progression:
+**Supported Datasets:**
 
-- MNIST (28×28, grayscale): quickest sanity check for likelihood and sample quality.
-- CIFAR‑10 (32×32, RGB): standard benchmark for FID/IS comparisons.
+- **MNIST** (28×28, grayscale): ✅ Implemented - quickest sanity check for likelihood and sample quality.
+- **CIFAR‑10** (32×32, RGB): ✅ Implemented - standard benchmark for FID/IS comparisons.
+
+The pipeline automatically handles both datasets via the `dataset` field in config files. See `CIFAR10_GUIDE.md` for detailed CIFAR-10 usage instructions.
 
 Evaluation metrics:
 
@@ -170,20 +172,27 @@ Phase C — Signature context:
 - Optional: `signatory` (GPU build) or `iisignature`. If unavailable, use the Transformer context encoder.
 - Metrics: `torch-fidelity` (or `clean-fid`).
 
-Quick start (to be implemented once code is added):
+Quick start:
 
-```
+```bash
 pip install -r requirements.txt
 
 # Baseline Markov on MNIST
-bash scripts/train_markov.sh configs/markov_mnist.yaml
+python -m nmsd.training.train configs/markov_mnist.yaml
 
-# Non‑Markov + Signature on CIFAR‑10
-bash scripts/train_nonmarkov_sig.sh configs/nonmarkov_cifar_signature.yaml
+# Non‑Markov + Signature on MNIST
+python -m nmsd.training.train_nonmarkov configs/nonmarkov_mnist_signature.yaml
 
-# Evaluate FID
-bash scripts/eval_fid.sh --dataset cifar10 --ckpt experiments/checkpoints/best.pt
+# DART with Signature on MNIST
+python -m nmsd.training.train_dart configs/dart_mnist_signature.yaml
+
+# CIFAR-10 Examples
+python -m nmsd.training.train configs/markov_cifar10.yaml
+python -m nmsd.training.train_nonmarkov configs/nonmarkov_cifar10_signature.yaml
+python -m nmsd.training.train_dart configs/dart_cifar10_signature.yaml
 ```
+
+See `QUICKSTART.md` for basic usage and `CIFAR10_GUIDE.md` for CIFAR-10 specific instructions.
 
 
 ## 8) Implementation guidance (high‑level)
