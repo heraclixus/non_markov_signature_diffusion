@@ -7,7 +7,5 @@ tqdm>=4.66
 Pillow>=9.0
 matplotlib>=3.5
 psutil>=5.9
-
-# Optional: for signature encoding (Phase C)
-# pysiglib>=0.1  # Uncomment to enable signature encoders
+pysiglib>=0.2.2
 
