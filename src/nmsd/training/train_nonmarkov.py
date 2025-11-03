@@ -165,9 +165,18 @@ def train(cfg: Dict):
             loss = losses["loss"]
             opt.zero_grad(set_to_none=True)
             loss.backward()
+            
+            # Clip gradients to prevent exploding gradients (helps with memory spikes)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            torch.nn.utils.clip_grad_norm_(encoder.parameters(), max_norm=1.0)
+            
             opt.step()
             ema_model.update(model)
             ema_encoder.update(encoder)
+            
+            # Clear cache periodically to prevent memory fragmentation
+            if global_step % 50 == 0 and device.type == "cuda":
+                torch.cuda.empty_cache()
 
             global_step += 1
             

@@ -3,7 +3,7 @@ seed: 42
 data:
   dataset: cifar10
   root: data
-  batch_size: 32  # Reduced from 64 for memory efficiency
+  batch_size: 32  # Reduced from 64 for memory
   num_workers: 4
   image_size: 32
 
@@ -11,7 +11,7 @@ diffusion:
   T: 1000
   schedule: cosine
   cosine_s: 0.008
-  num_suffix_steps: 5  # Reduced from 10 to save memory
+  num_suffix_steps: 5  # Reduced from 10 to save memory (fewer future images)
 
 model:
   in_channels: 3  # RGB images
@@ -24,7 +24,7 @@ model:
 encoder:
   type: signature  # 'transformer' or 'signature'
   # Signature encoder params
-  signature_degree: 2  # Reduced from 3 (degree 3 is very memory intensive for RGB)
+  signature_degree: 2  # Reduced from 3 (much smaller signature)
   pooling: spatial_mean  # Changed from conv_pool to save memory
   time_augment: true  # Add time as an extra channel
   use_lead_lag: false  # Lead-lag transformation
@@ -37,7 +37,7 @@ training:
   log_every: 100
   sample_every_steps: 1000
   save_every_steps: 5000
-  out_dir: experiments/nonmarkov_signature_cifar10
+  out_dir: experiments/nonmarkov_signature_cifar10_lowmem
   ema_decay: 0.9999
   loss_type: epsilon  # Epsilon prediction with signature encoding
   weighting: none

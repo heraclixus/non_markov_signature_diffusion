@@ -165,6 +165,8 @@ Phase C — Signature context:
 6. Ablations: encoder type (Transformer vs Signature), context dimensionality, schedule {γ_t}, T.
 7. Report FID/IS and likelihood where practical.
 
+**Evaluation**: Quantitative metrics (FID, IS) are available via the evaluation pipeline. See `EVALUATION_GUIDE.md` for details.
+
 
 ## 7) Setup notes
 
@@ -192,7 +194,7 @@ python -m nmsd.training.train_nonmarkov configs/nonmarkov_cifar10_signature.yaml
 python -m nmsd.training.train_dart configs/dart_cifar10_signature.yaml
 ```
 
-See `QUICKSTART.md` for basic usage and `CIFAR10_GUIDE.md` for CIFAR-10 specific instructions.
+See `QUICKSTART.md` for basic usage, `CIFAR10_GUIDE.md` for CIFAR-10 instructions, and `EVALUATION_GUIDE.md` for quantitative evaluation.
 
 
 ## 8) Implementation guidance (high‑level)
