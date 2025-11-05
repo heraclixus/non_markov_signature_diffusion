@@ -20,7 +20,7 @@ model:
   time_emb_dim: 256
 
 training:
-  epochs: 30
+  epochs: 47  # ~22K steps (60K/128 = 469 steps/epoch, 47*469 ≈ 22K steps)
   lr: 2.0e-4
   weight_decay: 0.0
   log_every: 100

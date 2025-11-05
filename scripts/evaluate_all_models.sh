@@ -1,17 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Script to evaluate all trained models
+# Script to evaluate all trained models at target checkpoint for fair comparison
 # Generates samples and computes FID/IS for each checkpoint
 
 DATASET=${1:-mnist}  # 'mnist' or 'cifar10'
-NUM_SAMPLES=${2:-10000}  # Number of samples per model
+NUM_SAMPLES=1000  # Number of samples per model
 NUM_STEPS=${3:-50}  # Sampling steps
 GPU=${4:-0}  # GPU to use
+
+# Set target checkpoint based on dataset for fair comparison
+if [ "$DATASET" == "mnist" ]; then
+    TARGET_STEP=22000  # MNIST target: 22K steps
+elif [ "$DATASET" == "cifar10" ]; then
+    TARGET_STEP=40000  # CIFAR-10 target: 40K steps (updated from 155K for faster training)
+else
+    TARGET_STEP=0
+fi
 
 echo "========================================"
 echo "Evaluating All ${DATASET} Models"
 echo "========================================"
+echo "Target checkpoint: ${TARGET_STEP} steps"
 echo "Num samples: $NUM_SAMPLES"
 echo "Sampling steps: $NUM_STEPS"
 echo "GPU: $GPU"
@@ -25,7 +35,7 @@ cd "$PROJECT_ROOT"
 RESULTS_DIR="evaluation_results_${DATASET}"
 mkdir -p "$RESULTS_DIR"
 
-# Function to evaluate a model
+# Function to evaluate a model at target checkpoint
 evaluate_model() {
     local config=$1
     local experiment_dir=$2
@@ -35,7 +45,7 @@ evaluate_model() {
     echo "Evaluating: $model_name"
     echo "----------------------------------------"
     
-    # Find latest checkpoint
+    # Find checkpoint closest to target step
     local checkpoint_dir="$experiment_dir/checkpoints"
     
     if [ ! -d "$checkpoint_dir" ]; then
@@ -44,21 +54,47 @@ evaluate_model() {
         return 1
     fi
     
-    local latest_checkpoint=$(ls -t "$checkpoint_dir"/model_*.pt 2>/dev/null | head -1)
+    # Find closest checkpoint to target
+    local closest_checkpoint=""
+    local min_diff=999999999
     
-    if [ -z "$latest_checkpoint" ]; then
+    for ckpt in "$checkpoint_dir"/model_*.pt; do
+        if [ -f "$ckpt" ]; then
+            # Extract step number from filename
+            local step=$(basename "$ckpt" .pt | sed 's/model_0*//')
+            local diff=$(( TARGET_STEP - step ))
+            # Get absolute difference
+            [ $diff -lt 0 ] && diff=$(( -diff ))
+            
+            if [ $diff -lt $min_diff ]; then
+                min_diff=$diff
+                closest_checkpoint="$ckpt"
+            fi
+        fi
+    done
+    
+    if [ -z "$closest_checkpoint" ]; then
         echo "⚠ No checkpoint files found for $model_name"
         echo ""
         return 1
     fi
     
+    local actual_step=$(basename "$closest_checkpoint" .pt | sed 's/model_0*//')
+    
     echo "Config: $config"
-    echo "Checkpoint: $(basename "$latest_checkpoint")"
+    echo "Target step: $TARGET_STEP"
+    echo "Actual checkpoint: $(basename "$closest_checkpoint") (step $actual_step)"
+    echo "Difference: $min_diff steps"
+    
+    # Warn if far from target
+    if [ $min_diff -gt 10000 ]; then
+        echo "⚠ Warning: Checkpoint is $min_diff steps away from target"
+    fi
     
     # Run evaluation
     CUDA_VISIBLE_DEVICES=$GPU PYTHONPATH=src python -m nmsd.evaluation.evaluate \
         --config "$config" \
-        --checkpoint "$latest_checkpoint" \
+        --checkpoint "$closest_checkpoint" \
         --num-samples $NUM_SAMPLES \
         --num-steps $NUM_STEPS \
         --output-dir "$experiment_dir/evaluation"
@@ -88,6 +124,7 @@ elif [ "$DATASET" == "cifar10" ]; then
     evaluate_model "configs/nonmarkov_cifar10.yaml" "experiments/nonmarkov_ddim_cifar10" "nonmarkov_transformer_cifar10"
     evaluate_model "configs/nonmarkov_cifar10_signature.yaml" "experiments/nonmarkov_signature_cifar10" "nonmarkov_signature_cifar10"
     evaluate_model "configs/nonmarkov_cifar10_signature_lowmem.yaml" "experiments/nonmarkov_signature_cifar10_lowmem" "nonmarkov_signature_cifar10_lowmem"
+    evaluate_model "configs/nonmarkov_cifar10_signature_balanced.yaml" "experiments/nonmarkov_signature_cifar10_balanced" "nonmarkov_signature_cifar10_balanced"
     evaluate_model "configs/dart_cifar10.yaml" "experiments/dart_cifar10" "dart_transformer_cifar10"
     evaluate_model "configs/dart_cifar10_signature.yaml" "experiments/dart_signature_cifar10" "dart_signature_cifar10"
     

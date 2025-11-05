@@ -58,16 +58,20 @@ run_experiment "configs/markov_cifar10.yaml" "train" "logs/train_markov_cifar10.
 echo "[2/5] Non-Markov Transformer (CIFAR-10)"
 run_experiment "configs/nonmarkov_cifar10.yaml" "train_nonmarkov" "logs/train_nonmarkov_cifar10.log" "Non-Markov(Transformer)-CIFAR10"
 
-# 3. Non-Markov with Signature Encoder
-echo "[3/5] Non-Markov Signature (CIFAR-10)"
+# 3. Non-Markov with Signature Encoder (Balanced)
+echo "[3/6] Non-Markov Signature Balanced (CIFAR-10)"
+run_experiment "configs/nonmarkov_cifar10_signature_balanced.yaml" "train_nonmarkov" "logs/train_nonmarkov_sig_balanced_cifar10.log" "Non-Markov(Signature-Balanced)-CIFAR10"
+
+# 4. Non-Markov with Signature Encoder (Original - High Memory)
+echo "[4/6] Non-Markov Signature (CIFAR-10)"
 run_experiment "configs/nonmarkov_cifar10_signature.yaml" "train_nonmarkov" "logs/train_nonmarkov_sig_cifar10.log" "Non-Markov(Signature)-CIFAR10"
 
-# 4. DART with Transformer Encoder
-echo "[4/5] DART Transformer (CIFAR-10)"
+# 5. DART with Transformer Encoder
+echo "[5/6] DART Transformer (CIFAR-10)"
 run_experiment "configs/dart_cifar10.yaml" "train_dart" "logs/train_dart_cifar10.log" "DART(Transformer)-CIFAR10"
 
-# 5. DART with Signature Encoder
-echo "[5/5] DART Signature (CIFAR-10)"
+# 6. DART with Signature Encoder
+echo "[6/6] DART Signature (CIFAR-10)"
 run_experiment "configs/dart_cifar10_signature.yaml" "train_dart" "logs/train_dart_sig_cifar10.log" "DART(Signature)-CIFAR10"
 
 # Overall summary

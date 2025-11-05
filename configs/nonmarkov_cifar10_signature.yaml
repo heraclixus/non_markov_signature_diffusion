@@ -31,7 +31,7 @@ encoder:
   hidden_dim: 384  # Reduced from 512
 
 training:
-  epochs: 100  # More epochs for CIFAR-10
+  epochs: 50  # ~40K steps (50K/32 = 1562 steps/epoch, 25*1562 ≈ 39K steps)
   lr: 2.0e-4
   weight_decay: 0.0
   log_every: 100

@@ -24,14 +24,14 @@ model:
 encoder:
   type: signature  # 'transformer' or 'signature'
   # Signature encoder params
-  signature_degree: 3  # Truncation level (2-4 typical)
+  signature_degree: 2  # Truncation level (2-4 typical)
   pooling: spatial_mean  # 'spatial_mean', 'flatten', 'conv_pool'
   time_augment: true  # Add time as an extra channel
   use_lead_lag: false  # Lead-lag transformation
   hidden_dim: 256
 
 training:
-  epochs: 30
+  epochs: 47  # ~22K steps (60K/128 = 469 steps/epoch, 47*469 ≈ 22K steps)
   lr: 2.0e-4
   weight_decay: 0.0
   log_every: 100

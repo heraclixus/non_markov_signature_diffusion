@@ -21,7 +21,7 @@ model:
   dropout: 0.1
 
 training:
-  epochs: 100  # More epochs for CIFAR-10
+  epochs: 200  # ~40K steps (50K/128 = 390 steps/epoch, 100*390 ≈ 39K steps)
   lr: 2.0e-4
   weight_decay: 0.0
   log_every: 100

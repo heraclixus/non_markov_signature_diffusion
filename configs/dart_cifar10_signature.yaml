@@ -24,14 +24,14 @@ model:
 encoder:
   type: signature  # 'transformer' or 'signature'
   # Signature encoder params
-  signature_degree: 3  # Truncation level (2-4 typical)
+  signature_degree: 2  # Truncation level (2-4 typical)
   pooling: conv_pool  # 'spatial_mean', 'flatten', 'conv_pool' (conv_pool recommended for RGB)
   time_augment: true  # Add time as an extra channel
   use_lead_lag: false  # Lead-lag transformation
   hidden_dim: 512
 
 training:
-  epochs: 100  # More epochs for CIFAR-10
+  epochs: 100  # ~40K steps (50K/64 = 781 steps/epoch, 50*781 ≈ 39K steps)
   lr: 2.0e-4
   weight_decay: 0.0
   log_every: 100

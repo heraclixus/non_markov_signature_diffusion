@@ -28,7 +28,7 @@ encoder:
   pooling: mean  # mean, max, or cls
 
 training:
-  epochs: 100  # More epochs for CIFAR-10
+  epochs: 100  # ~40K steps (50K/64 = 781 steps/epoch, 50*781 ≈ 39K steps)
   lr: 2.0e-4
   weight_decay: 0.0
   log_every: 100

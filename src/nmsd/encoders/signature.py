@@ -27,7 +27,7 @@ class SignatureEncoder(nn.Module):
         image_channels: int = 1,
         image_size: int = 28,
         context_dim: int = 256,
-        signature_degree: int = 3,
+        signature_degree: int = 2,
         pooling: str = "spatial_mean",  # "spatial_mean", "flatten", "conv_pool"
         time_augment: bool = True,
         use_lead_lag: bool = False,

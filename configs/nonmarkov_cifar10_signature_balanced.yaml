@@ -1,0 +1,50 @@
+seed: 42
+
+data:
+  dataset: cifar10
+  root: data
+  batch_size: 48  # Balanced: between 32 (lowmem) and 64 (highmem)
+  num_workers: 4
+  image_size: 32
+
+diffusion:
+  T: 1000
+  schedule: cosine
+  cosine_s: 0.008
+  num_suffix_steps: 7  # Balanced: between 5 (lowmem) and 10 (highmem)
+
+model:
+  in_channels: 3  # RGB images
+  base_channels: 112  # Balanced: between 96 (lowmem) and 128 (highmem)
+  channel_mults: [1, 2, 2, 2]
+  num_res_blocks: 2
+  time_emb_dim: 448  # Balanced: between 384 (lowmem) and 512 (highmem)
+  context_dim: 448  # Balanced: between 384 (lowmem) and 512 (highmem)
+
+encoder:
+  type: signature  # 'transformer' or 'signature'
+  # Signature encoder params
+  signature_degree: 2  # Keep at 2 for stability and memory
+  pooling: spatial_mean  # Use spatial_mean (proven to work)
+  time_augment: true  # Add time as an extra channel
+  use_lead_lag: false  # Lead-lag transformation (keep false for memory)
+  hidden_dim: 448  # Balanced: between 384 (lowmem) and 512 (highmem)
+
+training:
+  epochs: 75  # ~40K steps (50K/48 = 1041 steps/epoch, 38*1041 ≈ 39.5K steps)
+  lr: 2.0e-4
+  weight_decay: 0.0
+  log_every: 100
+  sample_every_steps: 1000
+  save_every_steps: 5000
+  out_dir: experiments/nonmarkov_signature_cifar10_balanced
+  ema_decay: 0.9999
+  loss_type: epsilon  # Epsilon prediction with signature encoding
+  weighting: none
+  use_cfg: false
+  context_dropout: 0.0
+
+sampling:
+  cfg_scale: 0.0  # No CFG
+
+

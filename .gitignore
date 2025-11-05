@@ -70,3 +70,6 @@ evaluation_results_mnist/
 evaluation_results_cifar10/
 logs/
 log*.txt
+
+!evaluation_results_mnist/plots/
+!evaluation_results_cifar10/plots/
