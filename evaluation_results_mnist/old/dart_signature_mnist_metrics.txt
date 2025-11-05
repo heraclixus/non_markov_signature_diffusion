@@ -1,0 +1,7 @@
+Checkpoint: experiments/dart_signature/checkpoints/model_0014000.pt
+Dataset: mnist
+Num samples: 10000
+Sampling steps: 50
+
+Metrics:
+FID: 424.1167

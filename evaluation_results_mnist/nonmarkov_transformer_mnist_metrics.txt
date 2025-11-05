@@ -1,0 +1,7 @@
+Checkpoint: experiments/nonmarkov_ddim/checkpoints/model_0022000.pt
+Dataset: mnist
+Num samples: 1000
+Sampling steps: 50
+
+Metrics:
+FID: 43.3049

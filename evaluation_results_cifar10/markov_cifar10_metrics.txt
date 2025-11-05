@@ -1,0 +1,8 @@
+Checkpoint: experiments/markov_ddim_cifar10/checkpoints/model_0035000.pt
+Dataset: cifar10
+Num samples: 10000
+Sampling steps: 50
+
+Metrics:
+FID: 40.9658
+IS: 6.7149 ± 0.1684

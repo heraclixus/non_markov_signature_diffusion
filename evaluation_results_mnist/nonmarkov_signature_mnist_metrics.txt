@@ -1,0 +1,7 @@
+Checkpoint: experiments/nonmarkov_signature/checkpoints/model_0020000.pt
+Dataset: mnist
+Num samples: 1000
+Sampling steps: 50
+
+Metrics:
+FID: 24.8379

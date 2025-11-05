@@ -1,0 +1,8 @@
+Checkpoint: experiments/nonmarkov_signature_cifar10_lowmem/checkpoints/model_0155000.pt
+Dataset: cifar10
+Num samples: 10000
+Sampling steps: 50
+
+Metrics:
+FID: 49.7997
+IS: 7.2474 ± 0.1518
