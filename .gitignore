@@ -38,6 +38,8 @@ ENV/
 
 # Data
 data/
+!src/nmsd/data/
+!src/nmsd/data/**
 *.pt
 *.pth
 *.ckpt
