@@ -8,8 +8,9 @@ from torchvision.utils import save_image
 
 from nmsd.models.unet_context import ContextUNet
 from nmsd.encoders.transformer_context import SuffixTransformerEncoder
+from nmsd.encoders.signature import SignatureEncoder, SignatureTransformerEncoder
 from nmsd.diffusion.schedulers import build_schedule
-from nmsd.diffusion.sampler import nonmarkov_ddim_sample_loop
+from nmsd.diffusion.sampler import nonmarkov_ddim_sample_loop, efficient_nonmarkov_sample_loop
 
 
 @torch.no_grad()
@@ -44,15 +45,46 @@ def main():
     model.eval()
 
     # Load encoder
-    encoder = SuffixTransformerEncoder(
-        image_channels=int(cfg["model"]["in_channels"]),
-        image_size=int(cfg["data"]["image_size"]),
-        context_dim=int(cfg["model"]["context_dim"]),
-        hidden_dim=int(cfg["encoder"]["hidden_dim"]),
-        num_heads=int(cfg["encoder"]["num_heads"]),
-        num_layers=int(cfg["encoder"]["num_layers"]),
-        pooling=cfg["encoder"]["pooling"],
-    ).to(device)
+    encoder_type = cfg.get("encoder", {}).get("type", "transformer")
+    print(f"Loading encoder type: {encoder_type}")
+
+    if encoder_type == "signature":
+        encoder = SignatureEncoder(
+            image_channels=int(cfg["model"]["in_channels"]),
+            image_size=int(cfg["data"]["image_size"]),
+            context_dim=int(cfg["model"]["context_dim"]),
+            signature_degree=int(cfg["encoder"].get("signature_degree", 3)),
+            pooling=cfg["encoder"].get("pooling", "spatial_mean"),
+            time_augment=cfg["encoder"].get("time_augment", True),
+            use_lead_lag=cfg["encoder"].get("use_lead_lag", False),
+            hidden_dim=int(cfg["encoder"].get("hidden_dim", 256)),
+        ).to(device)
+    elif encoder_type == "signature_trans":
+        encoder = SignatureTransformerEncoder(
+            image_channels=int(cfg["model"]["in_channels"]),
+            image_size=int(cfg["data"]["image_size"]),
+            context_dim=int(cfg["model"]["context_dim"]),
+            hidden_dim=int(cfg["encoder"]["hidden_dim"]),
+            num_heads=int(cfg["encoder"]["num_heads"]),
+            num_layers=int(cfg["encoder"]["num_layers"]),
+            pooling=cfg["encoder"]["pooling"],
+            transformer_pooling=cfg["encoder"].get("transformer_pooling", "mean"),
+            use_signature_tokens=cfg["encoder"].get("use_signature_tokens", False),
+            signature_degree=int(cfg["encoder"].get("signature_degree", 2)),
+            window_size=int(cfg["encoder"].get("window_size", 3)),
+            time_augment=cfg["encoder"].get("time_augment", True),
+        ).to(device)
+    else:
+        encoder = SuffixTransformerEncoder(
+            image_channels=int(cfg["model"]["in_channels"]),
+            image_size=int(cfg["data"]["image_size"]),
+            context_dim=int(cfg["model"]["context_dim"]),
+            hidden_dim=int(cfg["encoder"]["hidden_dim"]),
+            num_heads=int(cfg["encoder"]["num_heads"]),
+            num_layers=int(cfg["encoder"]["num_layers"]),
+            pooling=cfg["encoder"]["pooling"],
+        ).to(device)
+        
     encoder.load_state_dict(ckpt.get("ema_encoder", ckpt["encoder"]))
     encoder.eval()
 
@@ -73,14 +105,25 @@ def main():
         prediction_type = "x0" if cfg["training"]["loss_type"] == "dart" else "epsilon"
 
     print(f"Generating {args.num} samples with {args.steps} DDIM steps, {args.suffix_steps} suffix steps (eta={args.eta}, prediction_type={prediction_type})...")
-    samples = nonmarkov_ddim_sample_loop(
-        model, encoder, (args.num, c, s, s), sch,
-        device=device,
-        num_steps=int(args.steps),
-        num_suffix_steps=int(args.suffix_steps),
-        eta=float(args.eta),
-        prediction_type=prediction_type
-    )
+    
+    if encoder_type == "signature":
+        print("Using efficient incremental signature sampler...")
+        samples = efficient_nonmarkov_sample_loop(
+            model, encoder, (args.num, c, s, s), sch,
+            device=device,
+            num_steps=int(args.steps),
+            eta=float(args.eta),
+            prediction_type=prediction_type
+        )
+    else:
+        samples = nonmarkov_ddim_sample_loop(
+            model, encoder, (args.num, c, s, s), sch,
+            device=device,
+            num_steps=int(args.steps),
+            num_suffix_steps=int(args.suffix_steps),
+            eta=float(args.eta),
+            prediction_type=prediction_type
+        )
 
     # scale to [0,1]
     samples = (samples.clamp(-1, 1) + 1) / 2

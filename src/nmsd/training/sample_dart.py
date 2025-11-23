@@ -10,7 +10,7 @@ from nmsd.models.unet_context import ContextUNet
 from nmsd.encoders.transformer_context import SuffixTransformerEncoder
 from nmsd.encoders.signature import SignatureEncoder
 from nmsd.diffusion.schedulers import build_schedule
-from nmsd.diffusion.sampler import dart_simple_sample_loop, nonmarkov_ddim_sample_loop
+from nmsd.diffusion.sampler import dart_simple_sample_loop, nonmarkov_ddim_sample_loop, efficient_nonmarkov_sample_loop
 
 
 @torch.no_grad()
@@ -104,6 +104,8 @@ def main():
         print(f"  CFG may not work well. Consider training with use_cfg=true")
 
     # Choose sampler
+    encoder_type = cfg.get("encoder", {}).get("type", "transformer")
+    
     if args.sampler == "dart":
         print(f"Generating {args.num} samples with DART simple sampler ({args.steps} steps, CFG={cfg_scale})...")
         samples = dart_simple_sample_loop(
@@ -116,14 +118,24 @@ def main():
         )
     else:  # ddim
         print(f"Generating {args.num} samples with DDIM sampler ({args.steps} steps, eta={args.eta})...")
-        samples = nonmarkov_ddim_sample_loop(
-            model, encoder, (args.num, c, s, s), sch,
-            device=device,
-            num_steps=int(args.steps),
-            num_suffix_steps=int(args.suffix_steps),
-            eta=float(args.eta),
-            prediction_type="x0"
-        )
+        if encoder_type == "signature":
+             print("Using efficient incremental signature sampler...")
+             samples = efficient_nonmarkov_sample_loop(
+                model, encoder, (args.num, c, s, s), sch,
+                device=device,
+                num_steps=int(args.steps),
+                eta=float(args.eta),
+                prediction_type="x0"
+             )
+        else:
+            samples = nonmarkov_ddim_sample_loop(
+                model, encoder, (args.num, c, s, s), sch,
+                device=device,
+                num_steps=int(args.steps),
+                num_suffix_steps=int(args.suffix_steps),
+                eta=float(args.eta),
+                prediction_type="x0"
+            )
 
     # scale to [0,1]
     samples = (samples.clamp(-1, 1) + 1) / 2
