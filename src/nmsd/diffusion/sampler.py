@@ -340,3 +340,94 @@ def nonmarkov_ddim_sample_loop(
     return x
 
 
+@torch.no_grad()
+def efficient_nonmarkov_sample_loop(
+    model: nn.Module,
+    encoder: nn.Module,
+    shape,
+    schedule: DiffusionSchedule,
+    device: torch.device,
+    num_steps: int = 50,
+    eta: float = 0.0,
+    prediction_type: str = "epsilon",
+) -> torch.Tensor:
+    """
+    Efficient Non-Markov DDIM sampling using incremental signature updates.
+    
+    Uses forward_incremental to update signature context in O(1) instead of O(L),
+    using the actual generated trajectory as the suffix.
+    
+    Args:
+        model: ContextUNet
+        encoder: SignatureEncoder (must support forward_incremental)
+        shape: [B, C, H, W]
+        schedule: DiffusionSchedule
+        device: torch.device
+        num_steps: int
+        eta: float
+        prediction_type: "epsilon" or "x0"
+    """
+    # Create sampling timestep schedule
+    timesteps = np.linspace(schedule.T, 0, num_steps + 1).astype(int)
+    timesteps = torch.from_numpy(timesteps).to(device)
+    
+    # Start from pure noise
+    x = torch.randn(shape, device=device)
+    B = shape[0]
+    
+    # Initialize running signature (identity for path of length 1)
+    if not hasattr(encoder, "get_empty_signature"):
+         raise ValueError("Encoder must support get_empty_signature for efficient sampling")
+         
+    running_sig = encoder.get_empty_signature(B, device)
+    
+    x_next = None
+    t_next = None
+    
+    # Reverse diffusion
+    for i in range(num_steps):
+        t = timesteps[i]
+        t_prev = timesteps[i + 1]
+        
+        t_batch = torch.full((B,), t, device=device, dtype=torch.long)
+        t_prev_batch = torch.full((B,), t_prev, device=device, dtype=torch.long)
+        
+        # Update context using incremental signature
+        # This uses the actual generated trajectory x_{t:T}
+        context, running_sig = encoder.forward_incremental(
+            x, t_batch,
+            x_next, t_next,
+            running_sig
+        )
+        
+        # DDIM step
+        gamma_t = extract_per_timestep(schedule.gamma, t_batch, x.shape)
+        gamma_prev = extract_per_timestep(schedule.gamma, t_prev_batch, x.shape)
+        
+        model_output = model(x, t_batch, context)
+        
+        if prediction_type == "epsilon":
+            eps_pred = model_output
+            x0_pred = (x - torch.sqrt(1.0 - gamma_t) * eps_pred) / torch.sqrt(gamma_t)
+            x0_pred = x0_pred.clamp(-1.0, 1.0)
+        elif prediction_type == "x0":
+            x0_pred = model_output.clamp(-1.0, 1.0)
+            eps_pred = (x - torch.sqrt(gamma_t) * x0_pred) / torch.sqrt(1.0 - gamma_t)
+        else:
+            raise ValueError(f"Unknown prediction_type: {prediction_type}")
+            
+        # DDIM formula
+        dir_xt = torch.sqrt(1.0 - gamma_prev - eta**2 * (1 - gamma_prev) / (1 - gamma_t + 1e-8) * (1 - gamma_t / (gamma_prev + 1e-8))) * eps_pred
+        x_prev = torch.sqrt(gamma_prev) * x0_pred + dir_xt
+        
+        if eta > 0 and t_prev > 0:
+            sigma = eta * torch.sqrt((1 - gamma_prev) / (1 - gamma_t + 1e-8) * (1 - gamma_t / (gamma_prev + 1e-8)))
+            noise = torch.randn_like(x)
+            x_prev = x_prev + sigma * noise
+            
+        # Update state for next iteration
+        x_next = x.clone()
+        t_next = t_batch
+        x = x_prev
+        
+    return x

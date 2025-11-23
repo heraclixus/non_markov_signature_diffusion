@@ -103,6 +103,9 @@ class SignatureEncoder(nn.Module):
             else:
                 sig_dim = (path_dim_ll ** (signature_degree + 1) - 1) // (path_dim_ll - 1)
         
+        self.path_dim = path_dim
+        self.sig_dim = sig_dim
+        
         print(f"SignatureEncoder: path_dim={path_dim}, degree={signature_degree}, sig_dim={sig_dim}")
         
         # Project signature to context_dim
@@ -174,6 +177,141 @@ class SignatureEncoder(nn.Module):
         
         return context
 
+    def _get_single_step_features(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        """Helper to extract features and time-augment for a single step."""
+        # x: [B, C, H, W], t: [B]
+        
+        # Extract features
+        if self.pooling == "conv_pool":
+            features = self.conv(x)  # [B, feature_dim]
+        else:
+            # For pool lambda or sequential, inputs are usually expected as [..., C, H, W]
+            # Since self.pool in __init__ handles [B, L, C, H, W], we might need to check dimensions
+            # But the lambda x.mean(dim=[-2, -1]) works for any number of leading dims.
+            # The Flatten/Linear in 'flatten' might expect [B, L, ...].
+            if self.pooling == "flatten":
+                # Reshape to behave like sequence of length 1 for the Sequential
+                # Or just apply directly if layers support it.
+                # Flatten(start_dim=-3) works on [B, C, H, W] -> [B, C*H*W]
+                # Linear expects [..., in_features]
+                features = self.pool(x)
+            else:
+                features = self.pool(x)
+                
+        # Time augmentation
+        if self.time_augment:
+            time_normalized = t.float().unsqueeze(-1) / 1000.0  # [B, 1]
+            path = torch.cat([time_normalized, features], dim=-1)  # [B, feature_dim+1]
+        else:
+            path = features
+            
+        if path.dtype != torch.float32:
+            path = path.float()
+            
+        return path
+
+    def get_empty_signature(self, batch_size: int, device: torch.device) -> torch.Tensor:
+        """Returns identity signature (for path of length 1)."""
+        sig = torch.zeros(batch_size, self.sig_dim, device=device)
+        sig[:, 0] = 1.0
+        return sig
+
+    def forward_incremental(
+        self, 
+        x_curr: torch.Tensor, 
+        t_curr: torch.Tensor,
+        x_next: torch.Tensor | None, 
+        t_next: torch.Tensor | None,
+        running_signature: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Incremental signature update for efficient sampling.
+        
+        Updates the running signature of the suffix x_{t:T} by prepending x_curr.
+        Also computes the full context signature for 0 -> x_curr -> ... -> x_T.
+        
+        Args:
+            x_curr: [B, C, H, W] - current image at time t
+            t_curr: [B] - current timestep t
+            x_next: [B, C, H, W] or None - image at time t+1 (previous in loop)
+            t_next: [B] or None - timestep t+1
+            running_signature: [B, sig_dim] - signature of x_{t+1:T} (or identity if t=T)
+            
+        Returns:
+            context: [B, context_dim] - encoded context for x_{t:T} with basepoint
+            new_running_signature: [B, sig_dim] - updated signature for x_{t:T}
+        """
+        path_curr = self._get_single_step_features(x_curr, t_curr)  # [B, D]
+        
+        # 1. Update running signature to include segment x_curr -> x_next
+        if x_next is not None:
+            path_next = self._get_single_step_features(x_next, t_next)  # [B, D]
+            
+            # Create segment [x_curr, x_next]
+            # pysiglib expects [B, L, D]
+            segment = torch.stack([path_curr, path_next], dim=1)  # [B, 2, D]
+            
+            # Compute signature of this segment
+            seg_sig = pysiglib.signature(
+                segment,
+                degree=self.signature_degree,
+                time_aug=False,
+                lead_lag=self.use_lead_lag
+            )
+            # pysiglib.sig_combine requires double inputs
+            if seg_sig.dtype != torch.float64:
+                seg_sig = seg_sig.double()
+            
+            running_sig_double = running_signature.double()
+                
+            # Combine: S(curr->next) * S(next->end)
+            new_running_signature = pysiglib.sig_combine(
+                seg_sig, 
+                running_sig_double, 
+                self.path_dim, 
+                self.signature_degree
+            )
+            
+            # Convert back to float for storage
+            if new_running_signature.dtype == torch.float64:
+                new_running_signature = new_running_signature.float()
+        else:
+            # At t=T, x_{t:T} is just x_T (length 1), so signature is identity
+            # running_signature passed in should be identity
+            new_running_signature = running_signature
+            
+        # 2. Compute full signature with basepoint: 0 -> x_curr -> ...
+        # First compute segment 0 -> x_curr
+        basepoint = torch.zeros_like(path_curr) # [B, D]
+        prefix_segment = torch.stack([basepoint, path_curr], dim=1) # [B, 2, D]
+        
+        prefix_sig = pysiglib.signature(
+            prefix_segment,
+            degree=self.signature_degree,
+            time_aug=False,
+            lead_lag=self.use_lead_lag
+        )
+        if prefix_sig.dtype != torch.float64:
+            prefix_sig = prefix_sig.double()
+            
+        new_running_signature_double = new_running_signature.double()
+            
+        # Combine: S(0->curr) * S(curr->end)
+        full_sig = pysiglib.sig_combine(
+            prefix_sig,
+            new_running_signature_double,
+            self.path_dim,
+            self.signature_degree
+        )
+        
+        if full_sig.dtype == torch.float64:
+            full_sig = full_sig.float()
+        
+        # Project to context
+        context = self.sig_proj(full_sig)
+        
+        return context, new_running_signature
+
 
 class LogSignatureEncoder(nn.Module):
     """
@@ -220,6 +358,13 @@ class LogSignatureEncoder(nn.Module):
         # TODO: Implement proper log-signature when pysiglib adds support
         # For now, use regular signature
         return self.signature_encoder(suffix, timesteps)
+
+    def forward_incremental(self, *args, **kwargs):
+        return self.signature_encoder.forward_incremental(*args, **kwargs)
+
+    def get_empty_signature(self, *args, **kwargs):
+        return self.signature_encoder.get_empty_signature(*args, **kwargs)
+
 
 
 class SinusoidalPosEmb(nn.Module):

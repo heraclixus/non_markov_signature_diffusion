@@ -18,7 +18,7 @@ from nmsd.data.datasets import get_dataloaders
 from nmsd.models.unet_context import ContextUNet
 from nmsd.encoders.transformer_context import SuffixTransformerEncoder
 from nmsd.encoders.signature import SignatureEncoder, SignatureTransformerEncoder
-from nmsd.diffusion.sampler import nonmarkov_ddim_sample_loop
+from nmsd.diffusion.sampler import nonmarkov_ddim_sample_loop, efficient_nonmarkov_sample_loop
 from nmsd.utils.logger import LossLogger, MemoryProfiler
 
 
@@ -281,13 +281,24 @@ def train(cfg: Dict):
                     # Use non-Markov DDIM with 50 steps for fast sampling
                     # Determine prediction type from loss_type
                     pred_type = "x0" if loss_type == "dart" else "epsilon"
-                    samples = nonmarkov_ddim_sample_loop(
-                        ema_model_copy,
-                        ema_encoder_copy,
-                        (16, cfg["model"]["in_channels"], cfg["data"]["image_size"], cfg["data"]["image_size"]),
-                        sch, device, num_steps=50, num_suffix_steps=5, eta=0.0,
-                        prediction_type=pred_type
-                    )
+                    
+                    # Use efficient sampler for signature encoder if possible
+                    if encoder_type == "signature":
+                        samples = efficient_nonmarkov_sample_loop(
+                            ema_model_copy,
+                            ema_encoder_copy,
+                            (16, cfg["model"]["in_channels"], cfg["data"]["image_size"], cfg["data"]["image_size"]),
+                            sch, device, num_steps=50, eta=0.0,
+                            prediction_type=pred_type
+                        )
+                    else:
+                        samples = nonmarkov_ddim_sample_loop(
+                            ema_model_copy,
+                            ema_encoder_copy,
+                            (16, cfg["model"]["in_channels"], cfg["data"]["image_size"], cfg["data"]["image_size"]),
+                            sch, device, num_steps=50, num_suffix_steps=5, eta=0.0,
+                            prediction_type=pred_type
+                        )
                 save_image_grid(samples, out_dir / "samples" / f"step_{global_step:07d}.png")
                 
                 # Plot losses
