@@ -21,7 +21,7 @@ from nmsd.diffusion.schedulers import build_schedule
 from nmsd.models.unet import UNet
 from nmsd.models.unet_context import ContextUNet
 from nmsd.encoders.transformer_context import SuffixTransformerEncoder
-from nmsd.encoders.signature import SignatureEncoder
+from nmsd.encoders.signature import SignatureEncoder, SignatureTransformerEncoder
 from nmsd.evaluation.metrics import evaluate_model
 
 
@@ -67,6 +67,18 @@ def load_model_from_checkpoint(config_path: Path, checkpoint_path: Path, device:
                 time_augment=config["encoder"].get("time_augment", True),
                 use_lead_lag=config["encoder"].get("use_lead_lag", False),
                 hidden_dim=int(config["encoder"].get("hidden_dim", 256)),
+            ).to(device)
+        elif encoder_type == "signature_trans":
+            # Hybrid: signature spatial features + transformer temporal modeling
+            encoder = SignatureTransformerEncoder(
+                image_channels=int(config["model"]["in_channels"]),
+                image_size=int(config["data"]["image_size"]),
+                context_dim=int(config["model"]["context_dim"]),
+                hidden_dim=int(config["encoder"]["hidden_dim"]),
+                num_heads=int(config["encoder"]["num_heads"]),
+                num_layers=int(config["encoder"]["num_layers"]),
+                pooling=config["encoder"]["pooling"],  # spatial pooling method
+                transformer_pooling=config["encoder"].get("transformer_pooling", "mean"),
             ).to(device)
         else:  # transformer
             encoder = SuffixTransformerEncoder(

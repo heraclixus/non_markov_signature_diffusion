@@ -1,0 +1,56 @@
+seed: 42
+
+data:
+  dataset: cifar10
+  root: data
+  batch_size: 32
+  num_workers: 4
+  image_size: 32
+
+diffusion:
+  T: 1000
+  schedule: cosine
+  cosine_s: 0.008
+  num_suffix_steps: 10
+
+model:
+  in_channels: 3
+  base_channels: 96
+  channel_mults: [1, 2, 2, 2]
+  num_res_blocks: 2
+  time_emb_dim: 384
+  context_dim: 384
+
+encoder:
+  type: signature_trans
+  
+  # Spatial feature extraction
+  pooling: spatial_mean  # 'spatial_mean', 'conv_pool'
+  
+  # Transformer (Step 1)
+  hidden_dim: 256  # Smaller hidden dim because signature output will be large
+  num_heads: 4
+  num_layers: 4
+  
+  # Pooling via Signature (Step 2)
+  transformer_pooling: signature
+  signature_degree: 2
+  time_augment: true
+
+training:
+  epochs: 50
+  lr: 2.0e-4
+  weight_decay: 0.0
+  log_every: 100
+  sample_every_steps: 1000
+  save_every_steps: 5000
+  out_dir: experiments/dart_trans_signature_cifar10
+  ema_decay: 0.9999
+  loss_type: dart
+  weighting: snr_sum
+  use_cfg: true
+  context_dropout: 0.1
+
+sampling:
+  cfg_scale: 1.5
+

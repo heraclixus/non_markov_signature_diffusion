@@ -1,0 +1,51 @@
+seed: 42
+
+data:
+  dataset: cifar10
+  root: data
+  batch_size: 64  # Full batch size
+  num_workers: 4
+  image_size: 32
+
+diffusion:
+  T: 1000
+  schedule: cosine
+  cosine_s: 0.008
+  num_suffix_steps: 10  # Full sequence length for better temporal modeling
+
+model:
+  in_channels: 3  # RGB images
+  base_channels: 128  # Full model capacity
+  channel_mults: [1, 2, 2, 2]
+  num_res_blocks: 2
+  time_emb_dim: 512
+  context_dim: 512  # Full context dimension
+
+encoder:
+  type: signature_trans  # Hybrid: signature feature extraction + transformer temporal modeling
+  # Spatial feature extraction params (from signature encoder)
+  pooling: conv_pool  # Best quality for RGB - uses convolutional feature extraction
+  # Transformer params
+  hidden_dim: 512  # Full hidden dimension
+  num_heads: 8  # Full number of attention heads
+  num_layers: 4  # Full depth
+  transformer_pooling: mean  # 'mean', 'max', or 'cls'
+
+training:
+  epochs: 100  # ~40K steps (50K/64 = 781 steps/epoch, 50*781 ≈ 39K steps)
+  lr: 2.0e-4
+  weight_decay: 0.0
+  log_every: 100
+  sample_every_steps: 10000
+  save_every_steps: 5000
+  out_dir: experiments/nonmarkov_signature_trans_cifar10_full
+  ema_decay: 0.9999
+  loss_type: epsilon  # Epsilon prediction with hybrid signature-transformer encoding
+  weighting: none
+  use_cfg: false
+  context_dropout: 0.0
+
+sampling:
+  cfg_scale: 0.0  # No CFG
+
+

@@ -51,28 +51,36 @@ run_experiment() {
 start_time=$(date +%s)
 
 # 1. Markov DDIM (Baseline)
-echo "[1/5] Markov DDIM (CIFAR-10)"
+echo "[1/8] Markov DDIM (CIFAR-10)"
 run_experiment "configs/markov_cifar10.yaml" "train" "logs/train_markov_cifar10.log" "Markov-CIFAR10"
 
 # 2. Non-Markov with Transformer Encoder
-echo "[2/5] Non-Markov Transformer (CIFAR-10)"
+echo "[2/8] Non-Markov Transformer (CIFAR-10)"
 run_experiment "configs/nonmarkov_cifar10.yaml" "train_nonmarkov" "logs/train_nonmarkov_cifar10.log" "Non-Markov(Transformer)-CIFAR10"
 
 # 3. Non-Markov with Signature Encoder (Balanced)
-echo "[3/6] Non-Markov Signature Balanced (CIFAR-10)"
+echo "[3/8] Non-Markov Signature Balanced (CIFAR-10)"
 run_experiment "configs/nonmarkov_cifar10_signature_balanced.yaml" "train_nonmarkov" "logs/train_nonmarkov_sig_balanced_cifar10.log" "Non-Markov(Signature-Balanced)-CIFAR10"
 
 # 4. Non-Markov with Signature Encoder (Original - High Memory)
-echo "[4/6] Non-Markov Signature (CIFAR-10)"
+echo "[4/8] Non-Markov Signature (CIFAR-10)"
 run_experiment "configs/nonmarkov_cifar10_signature.yaml" "train_nonmarkov" "logs/train_nonmarkov_sig_cifar10.log" "Non-Markov(Signature)-CIFAR10"
 
 # 5. DART with Transformer Encoder
-echo "[5/6] DART Transformer (CIFAR-10)"
+echo "[5/8] DART Transformer (CIFAR-10)"
 run_experiment "configs/dart_cifar10.yaml" "train_dart" "logs/train_dart_cifar10.log" "DART(Transformer)-CIFAR10"
 
 # 6. DART with Signature Encoder
-echo "[6/6] DART Signature (CIFAR-10)"
+echo "[6/8] DART Signature (CIFAR-10)"
 run_experiment "configs/dart_cifar10_signature.yaml" "train_dart" "logs/train_dart_sig_cifar10.log" "DART(Signature)-CIFAR10"
+
+# 7. DART with Signature-Transformer Hybrid Encoder
+echo "[7/8] DART Signature-Trans (CIFAR-10)"
+run_experiment "configs/dart_cifar10_signature_trans.yaml" "train_dart" "logs/train_dart_sig_trans_cifar10.log" "DART(Signature-Trans)-CIFAR10"
+
+# 8. DART with Transformer -> Signature Encoder
+echo "[8/8] DART Trans-Signature (CIFAR-10)"
+run_experiment "configs/dart_cifar10_trans_signature.yaml" "train_dart" "logs/train_dart_trans_sig_cifar10.log" "DART(Trans-Signature)-CIFAR10"
 
 # Overall summary
 end_time=$(date +%s)
@@ -93,6 +101,8 @@ echo "  - experiments/nonmarkov_ddim_cifar10/"
 echo "  - experiments/nonmarkov_signature_cifar10/"
 echo "  - experiments/dart_cifar10/"
 echo "  - experiments/dart_signature_cifar10/"
+echo "  - experiments/dart_signature_trans_cifar10/"
+echo "  - experiments/dart_trans_signature_cifar10/"
 echo ""
 echo "Compare results:"
 echo "  python scripts/compare_losses.py"

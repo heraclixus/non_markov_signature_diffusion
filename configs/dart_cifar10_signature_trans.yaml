@@ -1,0 +1,50 @@
+seed: 42
+
+data:
+  dataset: cifar10
+  root: data
+  batch_size: 32  # Reduced from 64 for memory efficiency
+  num_workers: 4
+  image_size: 32
+
+diffusion:
+  T: 1000
+  schedule: cosine
+  cosine_s: 0.008
+  num_suffix_steps: 5  # Reduced from 10 to save memory (fewer transformer sequence length)
+
+model:
+  in_channels: 3  # RGB images
+  base_channels: 96  # Reduced from 128 for memory
+  channel_mults: [1, 2, 2, 2]
+  num_res_blocks: 2
+  time_emb_dim: 384  # Reduced from 512
+  context_dim: 384  # Reduced from 512
+
+encoder:
+  type: signature_trans  # Hybrid: signature feature extraction + transformer temporal modeling
+  # Spatial feature extraction params (from signature encoder)
+  pooling: spatial_mean  # Changed from conv_pool to save memory (much cheaper than conv layers)
+  # Transformer params
+  hidden_dim: 384  # Reduced from 512
+  num_heads: 6  # Reduced from 8 (384 / 6 = 64 dim per head)
+  num_layers: 3  # Reduced from 4 layers
+  transformer_pooling: mean  # 'mean', 'max', or 'cls'
+
+training:
+  epochs: 50  # ~40K steps (50K/32 = 1562 steps/epoch, 25*1562 ≈ 39K steps)
+  lr: 2.0e-4
+  weight_decay: 0.0
+  log_every: 100
+  sample_every_steps: 10000
+  save_every_steps: 5000
+  out_dir: experiments/dart_signature_trans_cifar10_lowmem
+  ema_decay: 0.9999
+  loss_type: dart  # DART loss with hybrid signature-transformer encoding
+  weighting: snr_sum  # DART weighting
+  use_cfg: true  # Enable CFG for DART
+  context_dropout: 0.1  # 10% dropout for classifier-free guidance
+
+sampling:
+  cfg_scale: 1.5  # CFG scale for DART sampling
+

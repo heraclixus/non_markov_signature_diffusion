@@ -7,7 +7,7 @@ set -euo pipefail
 DATASET=${1:-mnist}  # 'mnist' or 'cifar10'
 NUM_SAMPLES=1000  # Number of samples per model
 NUM_STEPS=${3:-50}  # Sampling steps
-GPU=${4:-0}  # GPU to use
+GPU=${2:-0}  # GPU to use
 
 # Set target checkpoint based on dataset for fair comparison
 if [ "$DATASET" == "mnist" ]; then
@@ -86,9 +86,11 @@ evaluate_model() {
     echo "Actual checkpoint: $(basename "$closest_checkpoint") (step $actual_step)"
     echo "Difference: $min_diff steps"
     
-    # Warn if far from target
-    if [ $min_diff -gt 10000 ]; then
-        echo "⚠ Warning: Checkpoint is $min_diff steps away from target"
+    # Skip if checkpoint is too far from target
+    if [ $min_diff -gt 15000 ]; then
+        echo "⚠ Skipping: Checkpoint is $min_diff steps away from target (>15K)"
+        echo ""
+        return 1
     fi
     
     # Run evaluation
@@ -115,18 +117,23 @@ if [ "$DATASET" == "mnist" ]; then
     evaluate_model "configs/nonmarkov_mnist.yaml" "experiments/nonmarkov_ddim" "nonmarkov_transformer_mnist"
     evaluate_model "configs/nonmarkov_mnist_x0.yaml" "experiments/nonmarkov_x0" "nonmarkov_x0_mnist"
     evaluate_model "configs/nonmarkov_mnist_signature.yaml" "experiments/nonmarkov_signature" "nonmarkov_signature_mnist"
+    evaluate_model "configs/nonmarkov_mnist_signature_trans.yaml" "experiments/nonmarkov_signature_trans" "nonmarkov_signature_trans_mnist"
     evaluate_model "configs/dart_mnist.yaml" "experiments/dart" "dart_transformer_mnist"
     evaluate_model "configs/dart_mnist_signature.yaml" "experiments/dart_signature" "dart_signature_mnist"
+    evaluate_model "configs/dart_mnist_signature_trans.yaml" "experiments/dart_signature_trans" "dart_signature_trans_mnist"
     
 elif [ "$DATASET" == "cifar10" ]; then
     # CIFAR-10 Models
     evaluate_model "configs/markov_cifar10.yaml" "experiments/markov_ddim_cifar10" "markov_cifar10"
     evaluate_model "configs/nonmarkov_cifar10.yaml" "experiments/nonmarkov_ddim_cifar10" "nonmarkov_transformer_cifar10"
-    evaluate_model "configs/nonmarkov_cifar10_signature.yaml" "experiments/nonmarkov_signature_cifar10" "nonmarkov_signature_cifar10"
     evaluate_model "configs/nonmarkov_cifar10_signature_lowmem.yaml" "experiments/nonmarkov_signature_cifar10_lowmem" "nonmarkov_signature_cifar10_lowmem"
     evaluate_model "configs/nonmarkov_cifar10_signature_balanced.yaml" "experiments/nonmarkov_signature_cifar10_balanced" "nonmarkov_signature_cifar10_balanced"
+    evaluate_model "configs/nonmarkov_cifar10_signature_trans.yaml" "experiments/nonmarkov_signature_trans_cifar10_lowmem" "nonmarkov_signature_trans_cifar10_lowmem"
+    evaluate_model "configs/nonmarkov_cifar10_signature_trans_full.yaml" "experiments/nonmarkov_signature_trans_cifar10_full" "nonmarkov_signature_trans_cifar10_full"
     evaluate_model "configs/dart_cifar10.yaml" "experiments/dart_cifar10" "dart_transformer_cifar10"
     evaluate_model "configs/dart_cifar10_signature.yaml" "experiments/dart_signature_cifar10" "dart_signature_cifar10"
+    evaluate_model "configs/dart_cifar10_signature_trans.yaml" "experiments/dart_signature_trans_cifar10_lowmem" "dart_signature_trans_cifar10_lowmem"
+    evaluate_model "configs/dart_cifar10_signature_trans_full.yaml" "experiments/dart_signature_trans_cifar10_full" "dart_signature_trans_cifar10_full"
     
 else
     echo "Error: Unknown dataset '$DATASET'"

@@ -1,0 +1,50 @@
+seed: 42
+
+data:
+  dataset: mnist
+  root: data
+  batch_size: 128
+  num_workers: 4
+  image_size: 28
+
+diffusion:
+  T: 1000
+  schedule: cosine
+  cosine_s: 0.008
+  num_suffix_steps: 10  # Number of future timesteps in suffix
+
+model:
+  in_channels: 1
+  base_channels: 64
+  channel_mults: [1, 2, 4]
+  num_res_blocks: 2
+  time_emb_dim: 256
+  context_dim: 256  # Dimension of suffix context embedding
+
+encoder:
+  type: signature_trans  # Hybrid: signature feature extraction + transformer temporal modeling
+  # Spatial feature extraction params (from signature encoder)
+  pooling: spatial_mean  # 'spatial_mean', 'flatten', 'conv_pool'
+  # Transformer params
+  hidden_dim: 256
+  num_heads: 4
+  num_layers: 2
+  transformer_pooling: mean  # 'mean', 'max', or 'cls'
+
+training:
+  epochs: 47  # ~22K steps (60K/128 = 469 steps/epoch, 47*469 ≈ 22K steps)
+  lr: 2.0e-4
+  weight_decay: 0.0
+  log_every: 100
+  sample_every_steps: 5000
+  save_every_steps: 2000
+  out_dir: experiments/nonmarkov_signature_trans
+  ema_decay: 0.999
+  loss_type: epsilon  # Epsilon prediction with hybrid signature-transformer encoding
+  weighting: none
+  use_cfg: false
+  context_dropout: 0.0
+
+sampling:
+  cfg_scale: 0.0  # No CFG
+

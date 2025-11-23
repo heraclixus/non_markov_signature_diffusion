@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+import math
 import torch
 import torch.nn as nn
 
@@ -219,4 +220,319 @@ class LogSignatureEncoder(nn.Module):
         # TODO: Implement proper log-signature when pysiglib adds support
         # For now, use regular signature
         return self.signature_encoder(suffix, timesteps)
+
+
+class SinusoidalPosEmb(nn.Module):
+    """Sinusoidal positional embeddings for timesteps."""
+    def __init__(self, dim: int):
+        super().__init__()
+        self.dim = dim
+
+    def forward(self, timesteps: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            timesteps: [B, L] or [B] - timesteps
+        Returns:
+            embeddings: [B, L, dim] or [B, dim]
+        """
+        original_shape = timesteps.shape
+        if timesteps.dim() == 1:
+            timesteps = timesteps.unsqueeze(1)  # [B, 1]
+        
+        half_dim = self.dim // 2
+        device = timesteps.device
+        emb = math.log(10000) / (half_dim - 1)
+        emb = torch.exp(torch.arange(half_dim, device=device) * -emb)
+        emb = timesteps.float().unsqueeze(-1) * emb.unsqueeze(0).unsqueeze(0)  # [B, L, half_dim]
+        emb = torch.cat([torch.sin(emb), torch.cos(emb)], dim=-1)
+        if self.dim % 2 == 1:
+            emb = torch.nn.functional.pad(emb, (0, 1))
+        
+        if len(original_shape) == 1:
+            emb = emb.squeeze(1)
+        return emb
+
+
+class SignatureTransformerEncoder(nn.Module):
+    """
+    Hybrid encoder that combines signature-based feature extraction with transformer temporal modeling.
+    
+    Architecture:
+    1. Use signature encoder's spatial feature extraction (spatial_mean, flatten, or conv_pool)
+    2. Apply transformer over the temporal dimension to model sequence dependencies
+    3. Pool and project to context_dim
+    
+    This treats signature methods as sophisticated image feature extractors while using
+    transformer attention to capture temporal relationships in the suffix sequence.
+    
+    Benefits:
+    - Signature pooling methods provide better spatial features than simple flattening
+    - Transformer captures complex temporal dependencies
+    - Combines strengths of both approaches
+    """
+    
+    def __init__(
+        self,
+        image_channels: int = 1,
+        image_size: int = 28,
+        context_dim: int = 256,
+        hidden_dim: int = 256,
+        num_heads: int = 4,
+        num_layers: int = 2,
+        pooling: str = "spatial_mean",  # "spatial_mean", "flatten", "conv_pool"
+        transformer_pooling: str = "mean",  # "mean", "max", or "cls"
+        use_signature_tokens: bool = False, # If True, compute signatures on sliding windows
+        signature_degree: int = 2,
+        window_size: int = 3,
+        time_augment: bool = True,
+    ):
+        super().__init__()
+        
+        self.image_channels = image_channels
+        self.image_size = image_size
+        self.context_dim = context_dim
+        self.pooling = pooling
+        self.transformer_pooling = transformer_pooling
+        self.use_signature_tokens = use_signature_tokens
+        self.window_size = window_size
+        self.signature_degree = signature_degree
+        self.time_augment = time_augment
+        
+        # Feature extraction from images (borrowed from SignatureEncoder)
+        if pooling == "spatial_mean":
+            # Simple spatial mean pooling
+            self.feature_dim = image_channels
+            self.pool = lambda x: x.mean(dim=[-2, -1])  # [B, L, C, H, W] -> [B, L, C]
+        
+        elif pooling == "flatten":
+            # Flatten and project
+            self.feature_dim = hidden_dim
+            self.pool = nn.Sequential(
+                nn.Flatten(start_dim=-3),  # [B, L, C*H*W]
+                nn.Linear(image_channels * image_size * image_size, hidden_dim),
+                nn.LayerNorm(hidden_dim),
+            )
+        
+        elif pooling == "conv_pool":
+            # Convolutional feature extraction
+            self.feature_dim = hidden_dim
+            self.conv = nn.Sequential(
+                nn.Conv2d(image_channels, 32, 3, stride=2, padding=1),
+                nn.SiLU(),
+                nn.Conv2d(32, 64, 3, stride=2, padding=1),
+                nn.SiLU(),
+                nn.AdaptiveAvgPool2d(1),
+                nn.Flatten(),
+                nn.Linear(64, hidden_dim),
+            )
+            self.pool = None  # Handled in forward
+        
+        else:
+            raise ValueError(f"Unknown pooling: {pooling}")
+        
+        # Project features to hidden_dim if needed (or if using signature tokens)
+        if self.use_signature_tokens:
+            # Calculate signature dimension
+            path_dim = self.feature_dim + 1 if time_augment else self.feature_dim
+            if path_dim == 1:
+                sig_dim = 1 + signature_degree
+            else:
+                sig_dim = (path_dim ** (signature_degree + 1) - 1) // (path_dim - 1)
+            
+            self.signature_proj = nn.Linear(sig_dim, hidden_dim)
+            print(f"Signature tokens enabled: window={window_size}, degree={signature_degree}, sig_dim={sig_dim}")
+        
+        elif self.feature_dim != hidden_dim:
+            self.feature_proj = nn.Linear(self.feature_dim, hidden_dim)
+        else:
+            self.feature_proj = nn.Identity()
+        
+        # Timestep embedding
+        self.time_emb = SinusoidalPosEmb(hidden_dim)
+        
+        # Optional CLS token for transformer pooling
+        if transformer_pooling == "cls":
+            self.cls_token = nn.Parameter(torch.randn(1, 1, hidden_dim))
+        
+        # Transformer encoder
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=hidden_dim,
+            nhead=num_heads,
+            dim_feedforward=hidden_dim * 4,
+            dropout=0.1,
+            activation="gelu",
+            batch_first=True,
+            norm_first=True,
+        )
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        
+        # Output projection
+        if transformer_pooling == "signature":
+            # Calculate signature dimension for transformer output
+            # Path dimension is hidden_dim (+1 if time_augment)
+            path_dim = hidden_dim + 1 if time_augment else hidden_dim
+            
+            if path_dim == 1:
+                sig_dim = 1 + signature_degree
+            else:
+                sig_dim = (path_dim ** (signature_degree + 1) - 1) // (path_dim - 1)
+                
+            self.output_proj = nn.Sequential(
+                nn.Linear(sig_dim, context_dim * 2),
+                nn.SiLU(),
+                nn.Linear(context_dim * 2, context_dim),
+                nn.LayerNorm(context_dim),
+            )
+            print(f"Transformer pooling: signature (path_dim={path_dim}, sig_dim={sig_dim})")
+        else:
+            self.output_proj = nn.Sequential(
+                nn.Linear(hidden_dim, context_dim),
+                nn.LayerNorm(context_dim),
+            )
+        
+        print(f"SignatureTransformerEncoder: pooling={pooling}, feature_dim={self.feature_dim}, "
+              f"hidden_dim={hidden_dim}, num_heads={num_heads}, num_layers={num_layers}, "
+              f"sig_tokens={use_signature_tokens}, trans_pool={transformer_pooling}")
+    
+    def forward(self, suffix: torch.Tensor, timesteps: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            suffix: [B, L, C, H, W] - sequence of noisy images
+            timesteps: [B, L] - corresponding timesteps
+        
+        Returns:
+            context: [B, context_dim] - encoded suffix context
+        """
+        B, L, C, H, W = suffix.shape
+        device = suffix.device
+        
+        # Extract spatial features from images using signature-based methods
+        if self.pooling == "conv_pool":
+            # Apply conv to each timestep
+            suffix_flat = suffix.view(B * L, C, H, W)
+            features = self.conv(suffix_flat)  # [B*L, feature_dim]
+            features = features.view(B, L, self.feature_dim)  # [B, L, feature_dim]
+        else:
+            # Apply pooling
+            features = self.pool(suffix)  # [B, L, feature_dim]
+        
+        if self.use_signature_tokens:
+            # Sliding window signatures
+            # features: [B, L, D]
+            if L < self.window_size:
+                 # Pad if sequence is too short for window
+                 pad_len = self.window_size - L
+                 features = torch.cat([features[:, :1].expand(-1, pad_len, -1), features], dim=1)
+                 timesteps = torch.cat([timesteps[:, :1].expand(-1, pad_len), timesteps], dim=1)
+                 L = features.shape[1]
+
+            # Create windows: [B, NumWindows, WindowSize, D]
+            # unfold returns [B, NumWindows, D, WindowSize], so we permute
+            windows = features.unfold(1, self.window_size, 1).permute(0, 1, 3, 2)
+            NumWindows = windows.shape[1]
+            
+            # Prepare for signature computation: flatten batch and windows
+            windows_flat = windows.reshape(B * NumWindows, self.window_size, self.feature_dim)
+            
+            # Handle timestamps for windows (use same unfolding)
+            # timesteps: [B, L]
+            time_windows = timesteps.unfold(1, self.window_size, 1) # [B, NumWindows, WindowSize]
+            time_windows_flat = time_windows.reshape(B * NumWindows, self.window_size)
+            
+            # Use the last timestep of each window for the transformer position embedding later
+            window_timesteps = time_windows[:, :, -1] # [B, NumWindows]
+            
+            # Time augmentation for signatures
+            if self.time_augment:
+                time_norm = time_windows_flat.float().unsqueeze(-1) / 1000.0 # [B*NW, WinSize, 1]
+                path = torch.cat([time_norm, windows_flat], dim=-1)
+            else:
+                path = windows_flat
+                
+            if path.dtype != torch.float32:
+                path = path.float()
+                
+            # Add basepoint zero for signature stability
+            BNW, WS, PD = path.shape
+            basepoint = torch.zeros(BNW, 1, PD, dtype=path.dtype, device=path.device)
+            path_with_basepoint = torch.cat([basepoint, path], dim=1)
+            
+            # Compute signatures: [B*NumWindows, SigDim]
+            sigs = pysiglib.signature(
+                path_with_basepoint,
+                degree=self.signature_degree,
+                time_aug=False,
+                lead_lag=False
+            )
+            
+            if sigs.dtype == torch.float64:
+                sigs = sigs.float()
+                
+            # Project to hidden_dim
+            sigs_proj = self.signature_proj(sigs) # [B*NumWindows, hidden_dim]
+            x = sigs_proj.view(B, NumWindows, -1) # [B, NumWindows, hidden_dim]
+            
+            # Use window timesteps for position embedding
+            timesteps = window_timesteps
+            
+        else:
+            # Standard path: Project to hidden_dim: [B, L, hidden_dim]
+            x = self.feature_proj(features)
+        
+        # Add timestep embeddings: [B, L, hidden_dim]
+        time_emb = self.time_emb(timesteps)  # [B, L, hidden_dim]
+        x = x + time_emb
+        
+        # Add CLS token if using cls pooling
+        if self.transformer_pooling == "cls":
+            cls_tokens = self.cls_token.expand(B, -1, -1)  # [B, 1, hidden_dim]
+            x = torch.cat([cls_tokens, x], dim=1)  # [B, L+1, hidden_dim]
+        
+        # Transformer encoding: [B, L(+1), hidden_dim]
+        x = self.transformer(x)
+        
+        # Pool to fixed size: [B, hidden_dim]
+        if self.transformer_pooling == "mean":
+            x = x.mean(dim=1)
+        elif self.transformer_pooling == "max":
+            x = x.max(dim=1)[0]
+        elif self.transformer_pooling == "cls":
+            x = x[:, 0]  # Use CLS token
+        elif self.transformer_pooling == "signature":
+             # Compute signature of x [B, L, H]
+             # Time augment if needed
+             if self.time_augment:
+                 # timesteps corresponds to the time of items in x
+                 # Normalize timesteps to [0, 1]
+                 time_normalized = timesteps.float().unsqueeze(-1) / 1000.0  # [B, L, 1]
+                 path = torch.cat([time_normalized, x], dim=-1)  # [B, L, H+1]
+             else:
+                 path = x
+                 
+             if path.dtype != torch.float32:
+                 path = path.float()
+                 
+             # Add basepoint (zero)
+             B_sig, L_sig, D_sig = path.shape
+             basepoint = torch.zeros(B_sig, 1, D_sig, dtype=path.dtype, device=path.device)
+             path_with_basepoint = torch.cat([basepoint, path], dim=1)
+             
+             # Compute signature
+             x = pysiglib.signature(
+                 path_with_basepoint,
+                 degree=self.signature_degree,
+                 time_aug=False,
+                 lead_lag=False
+             )
+             
+             if x.dtype == torch.float64:
+                 x = x.float()
+                 
+        else:
+            raise ValueError(f"Unknown transformer_pooling: {self.transformer_pooling}")
+        
+        # Project to context_dim: [B, context_dim]
+        context = self.output_proj(x)
+        
+        return context
 

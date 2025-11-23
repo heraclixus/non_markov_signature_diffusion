@@ -8,6 +8,7 @@ using torch-fidelity for consistent evaluation.
 from __future__ import annotations
 
 import os
+import math
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -22,15 +23,17 @@ def compute_fid(
     real_images_dataset: str,
     batch_size: int = 64,
     device: str = "cuda",
+    dataset_path: Optional[str | Path] = None,
 ) -> float:
     """
     Compute FID (Fréchet Inception Distance) between generated and real images.
     
     Args:
         generated_images_path: Path to directory containing generated images
-        real_images_dataset: Name of real dataset ('mnist' or 'cifar10')
+        real_images_dataset: Name of real dataset ('mnist', 'cifar10', 'imagenet')
         batch_size: Batch size for feature extraction
         device: Device to use
+        dataset_path: Path to dataset root (required for ImageNet)
     
     Returns:
         FID score (lower is better)
@@ -56,6 +59,26 @@ def compute_fid(
         print(f"Computing FID between generated images and CIFAR-10 training set...")
         # Use registered CIFAR-10 dataset
         real_images_input = "cifar10-train"
+    elif "imagenet" in dataset_lower:
+        if dataset_path is None:
+            raise ValueError("dataset_path is required for ImageNet FID computation")
+            
+        # For ImageNet, use validation set as reference
+        # Assuming structure root/val or root/validation
+        dataset_path = Path(dataset_path)
+        val_dir = dataset_path / "val"
+        if not val_dir.exists():
+            val_dir = dataset_path / "validation"
+        
+        if not val_dir.exists():
+             # Fallback: maybe the path itself is the validation set?
+             if (dataset_path / "n01440764").exists(): # Check for a synset folder
+                 val_dir = dataset_path
+             else:
+                raise FileNotFoundError(f"Could not find validation images in {dataset_path} (expected 'val' subdirectory)")
+        
+        print(f"Computing FID between generated images and ImageNet validation set ({val_dir})...")
+        real_images_input = str(val_dir)
     else:
         raise ValueError(f"Unknown dataset: {real_images_dataset}")
     
@@ -361,15 +384,16 @@ def evaluate_model(
     
     # FID
     try:
-        fid = compute_fid(samples_dir, dataset, device=device)
+        dataset_path = config.get("data", {}).get("root", None)
+        fid = compute_fid(samples_dir, dataset, device=device, dataset_path=dataset_path)
         metrics["fid"] = fid
         print(f"FID: {fid:.2f}")
     except Exception as e:
         print(f"Failed to compute FID: {e}")
         metrics["fid"] = float("nan")
     
-    # Inception Score (only for CIFAR-10, MNIST IS is not meaningful)
-    if dataset.lower() == "cifar10":
+    # Inception Score (CIFAR-10 and ImageNet)
+    if dataset.lower() == "cifar10" or "imagenet" in dataset.lower():
         try:
             is_mean, is_std = compute_inception_score(samples_dir, device=device)
             metrics["is_mean"] = is_mean
@@ -392,7 +416,7 @@ def evaluate_model(
         f.write(f"Sampling steps: {num_steps}\n")
         f.write(f"\nMetrics:\n")
         f.write(f"FID: {metrics['fid']:.4f}\n")
-        if dataset.lower() == "cifar10":
+        if not math.isnan(metrics['is_mean']):
             f.write(f"IS: {metrics['is_mean']:.4f} ± {metrics['is_std']:.4f}\n")
     
     print(f"Metrics saved to {metrics_file}")

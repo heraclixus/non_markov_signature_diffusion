@@ -17,7 +17,7 @@ from nmsd.diffusion.losses import nonmarkov_suffix_loss, dart_loss
 from nmsd.data.datasets import get_dataloaders
 from nmsd.models.unet_context import ContextUNet
 from nmsd.encoders.transformer_context import SuffixTransformerEncoder
-from nmsd.encoders.signature import SignatureEncoder
+from nmsd.encoders.signature import SignatureEncoder, SignatureTransformerEncoder
 from nmsd.diffusion.sampler import nonmarkov_ddim_sample_loop
 from nmsd.utils.logger import LossLogger, MemoryProfiler
 
@@ -88,7 +88,7 @@ def train(cfg: Dict):
         out_channels=int(cfg["model"]["in_channels"]),
     ).to(device)
 
-    # Suffix encoder (Transformer or Signature)
+    # Suffix encoder (Transformer, Signature, or SignatureTransformer hybrid)
     encoder_type = cfg["encoder"].get("type", "transformer")
     
     if encoder_type == "signature":
@@ -101,6 +101,22 @@ def train(cfg: Dict):
             time_augment=cfg["encoder"].get("time_augment", True),
             use_lead_lag=cfg["encoder"].get("use_lead_lag", False),
             hidden_dim=int(cfg["encoder"].get("hidden_dim", 256)),
+        ).to(device)
+    elif encoder_type == "signature_trans":
+        # Hybrid: signature spatial features + transformer temporal modeling
+        encoder = SignatureTransformerEncoder(
+            image_channels=int(cfg["model"]["in_channels"]),
+            image_size=int(cfg["data"]["image_size"]),
+            context_dim=int(cfg["model"]["context_dim"]),
+            hidden_dim=int(cfg["encoder"]["hidden_dim"]),
+            num_heads=int(cfg["encoder"]["num_heads"]),
+            num_layers=int(cfg["encoder"]["num_layers"]),
+            pooling=cfg["encoder"]["pooling"],  # spatial pooling method
+            transformer_pooling=cfg["encoder"].get("transformer_pooling", "mean"),
+            use_signature_tokens=cfg["encoder"].get("use_signature_tokens", False),
+            signature_degree=int(cfg["encoder"].get("signature_degree", 2)),
+            window_size=int(cfg["encoder"].get("window_size", 3)),
+            time_augment=cfg["encoder"].get("time_augment", True),
         ).to(device)
     else:  # transformer
         encoder = SuffixTransformerEncoder(
@@ -232,6 +248,22 @@ def train(cfg: Dict):
                         time_augment=cfg["encoder"].get("time_augment", True),
                         use_lead_lag=cfg["encoder"].get("use_lead_lag", False),
                         hidden_dim=int(cfg["encoder"].get("hidden_dim", 256)),
+                    ).to(device)
+                elif encoder_type == "signature_trans":
+                    # Hybrid: signature spatial features + transformer temporal modeling
+                    ema_encoder_copy = SignatureTransformerEncoder(
+                        image_channels=int(cfg["model"]["in_channels"]),
+                        image_size=int(cfg["data"]["image_size"]),
+                        context_dim=int(cfg["model"]["context_dim"]),
+                        hidden_dim=int(cfg["encoder"]["hidden_dim"]),
+                        num_heads=int(cfg["encoder"]["num_heads"]),
+                        num_layers=int(cfg["encoder"]["num_layers"]),
+                        pooling=cfg["encoder"]["pooling"],
+                        transformer_pooling=cfg["encoder"].get("transformer_pooling", "mean"),
+                        use_signature_tokens=cfg["encoder"].get("use_signature_tokens", False),
+                        signature_degree=int(cfg["encoder"].get("signature_degree", 2)),
+                        window_size=int(cfg["encoder"].get("window_size", 3)),
+                        time_augment=cfg["encoder"].get("time_augment", True),
                     ).to(device)
                 else:  # transformer
                     ema_encoder_copy = SuffixTransformerEncoder(

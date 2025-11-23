@@ -28,8 +28,10 @@ if [ "$DATASET" == "mnist" ]; then
     CKPT_NONMARKOV_EPS="experiments/nonmarkov_ddim/checkpoints/model_${STEP}.pt"
     CKPT_NONMARKOV_X0="experiments/nonmarkov_x0/checkpoints/model_${STEP}.pt"
     CKPT_NONMARKOV_SIG="experiments/nonmarkov_signature/checkpoints/model_${STEP}.pt"
+    CKPT_NONMARKOV_SIGTRANS="experiments/nonmarkov_signature_trans/checkpoints/model_${STEP}.pt"
     CKPT_DART="experiments/dart/checkpoints/model_${STEP}.pt"
     CKPT_DART_SIG="experiments/dart_signature/checkpoints/model_${STEP}.pt"
+    CKPT_DART_SIGTRANS="experiments/dart_signature_trans/checkpoints/model_${STEP}.pt"
     CKPT_DART_NO_CFG="experiments/dart_no_cfg/checkpoints/model_${STEP}.pt"
 elif [ "$DATASET" == "cifar10" ]; then
     CKPT_MARKOV="experiments/markov_ddim_cifar10/checkpoints/model_${STEP}.pt"
@@ -37,8 +39,12 @@ elif [ "$DATASET" == "cifar10" ]; then
     CKPT_NONMARKOV_SIG="experiments/nonmarkov_signature_cifar10/checkpoints/model_${STEP}.pt"
     CKPT_NONMARKOV_SIG_LOWMEM="experiments/nonmarkov_signature_cifar10_lowmem/checkpoints/model_${STEP}.pt"
     CKPT_NONMARKOV_SIG_BALANCED="experiments/nonmarkov_signature_cifar10_balanced/checkpoints/model_${STEP}.pt"
+    CKPT_NONMARKOV_SIGTRANS="experiments/nonmarkov_signature_trans_cifar10_lowmem/checkpoints/model_${STEP}.pt"
+    CKPT_NONMARKOV_SIGTRANS_FULL="experiments/nonmarkov_signature_trans_cifar10_full/checkpoints/model_${STEP}.pt"
     CKPT_DART="experiments/dart_cifar10/checkpoints/model_${STEP}.pt"
     CKPT_DART_SIG="experiments/dart_signature_cifar10/checkpoints/model_${STEP}.pt"
+    CKPT_DART_SIGTRANS="experiments/dart_signature_trans_cifar10_lowmem/checkpoints/model_${STEP}.pt"
+    CKPT_DART_SIGTRANS_FULL="experiments/dart_signature_trans_cifar10_full/checkpoints/model_${STEP}.pt"
 else
     echo "Error: Unknown dataset '$DATASET'"
     echo "Usage: bash scripts/sample_all_models.sh <mnist|cifar10> [step] [num_samples] [ddim_steps]"
@@ -99,13 +105,26 @@ if [ "$DATASET" == "mnist" ]; then
         PID_NONMARKOV_SIG=""
     fi
 
+    # Non-Markov SignatureTransformer
+    if [ -f "$CKPT_NONMARKOV_SIGTRANS" ]; then
+        echo "[5] Sampling from Non-Markov SignatureTransformer..."
+        CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_nonmarkov.sh \
+            "$CKPT_NONMARKOV_SIGTRANS" "experiments/nonmarkov_signature_trans/samples/final_${STEP}.png" \
+            "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 5 0.0 &> logs/sample_nonmarkov_sigtrans_${STEP}.log &
+        wait $PID_NONMARKOV_SIG 2>/dev/null || true
+        PID_NONMARKOV_SIGTRANS=$!
+    else
+        echo "  [SKIP] $CKPT_NONMARKOV_SIGTRANS"
+        PID_NONMARKOV_SIGTRANS=""
+    fi
+
     # DART Transformer
     if [ -f "$CKPT_DART" ]; then
-        echo "[5] Sampling from DART Transformer (CFG=1.5)..."
+        echo "[6] Sampling from DART Transformer (CFG=1.5)..."
         CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_dart.sh \
             "$CKPT_DART" "experiments/dart/samples/final_${STEP}.png" \
             "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 5 dart 1.0 1.5 &> logs/sample_dart_${STEP}.log &
-        wait $PID_NONMARKOV_SIG 2>/dev/null || true
+        wait $PID_NONMARKOV_SIGTRANS 2>/dev/null || true
         PID_DART=$!
     else
         echo "  [SKIP] $CKPT_DART"
@@ -114,7 +133,7 @@ if [ "$DATASET" == "mnist" ]; then
 
     # DART Signature
     if [ -f "$CKPT_DART_SIG" ]; then
-        echo "[6] Sampling from DART Signature (CFG=1.5)..."
+        echo "[7] Sampling from DART Signature (CFG=1.5)..."
         CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_dart.sh \
             "$CKPT_DART_SIG" "experiments/dart_signature/samples/final_${STEP}.png" \
             "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 5 dart 1.0 1.5 &> logs/sample_dart_sig_${STEP}.log &
@@ -124,14 +143,27 @@ if [ "$DATASET" == "mnist" ]; then
         echo "  [SKIP] $CKPT_DART_SIG"
         PID_DART_SIG=""
     fi
+
+    # DART SignatureTransformer
+    if [ -f "$CKPT_DART_SIGTRANS" ]; then
+        echo "[8] Sampling from DART SignatureTransformer (CFG=1.5)..."
+        CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_dart.sh \
+            "$CKPT_DART_SIGTRANS" "experiments/dart_signature_trans/samples/final_${STEP}.png" \
+            "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 5 dart 1.0 1.5 &> logs/sample_dart_sigtrans_${STEP}.log &
+        wait $PID_DART_SIG 2>/dev/null || true
+        PID_DART_SIGTRANS=$!
+    else
+        echo "  [SKIP] $CKPT_DART_SIGTRANS"
+        PID_DART_SIGTRANS=""
+    fi
     
     # DART No CFG
     if [ -f "$CKPT_DART_NO_CFG" ]; then
-        echo "[7] Sampling from DART No CFG..."
+        echo "[9] Sampling from DART No CFG..."
         CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_dart.sh \
             "$CKPT_DART_NO_CFG" "experiments/dart_no_cfg/samples/final_${STEP}.png" \
             "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 5 dart 1.0 0.0 &> logs/sample_dart_no_cfg_${STEP}.log &
-        wait $PID_DART_SIG 2>/dev/null || true
+        wait $PID_DART_SIGTRANS 2>/dev/null || true
         PID_DART_NO_CFG=$!
     else
         echo "  [SKIP] $CKPT_DART_NO_CFG"
@@ -207,13 +239,39 @@ elif [ "$DATASET" == "cifar10" ]; then
         PID_NONMARKOV_SIG_BALANCED=""
     fi
 
+    # Non-Markov SignatureTransformer (lowmem)
+    if [ -f "$CKPT_NONMARKOV_SIGTRANS" ]; then
+        echo "[6] Sampling from Non-Markov SignatureTransformer (lowmem)..."
+        CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_nonmarkov.sh \
+            "$CKPT_NONMARKOV_SIGTRANS" "experiments/nonmarkov_signature_trans_cifar10_lowmem/samples/final_${STEP}.png" \
+            "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 5 0.0 &> logs/sample_nonmarkov_sigtrans_lowmem_cifar10_${STEP}.log &
+        wait $PID_NONMARKOV_SIG_BALANCED 2>/dev/null || true
+        PID_NONMARKOV_SIGTRANS=$!
+    else
+        echo "  [SKIP] $CKPT_NONMARKOV_SIGTRANS"
+        PID_NONMARKOV_SIGTRANS=""
+    fi
+
+    # Non-Markov SignatureTransformer (full)
+    if [ -f "$CKPT_NONMARKOV_SIGTRANS_FULL" ]; then
+        echo "[7] Sampling from Non-Markov SignatureTransformer (full)..."
+        CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_nonmarkov.sh \
+            "$CKPT_NONMARKOV_SIGTRANS_FULL" "experiments/nonmarkov_signature_trans_cifar10_full/samples/final_${STEP}.png" \
+            "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 10 0.0 &> logs/sample_nonmarkov_sigtrans_full_cifar10_${STEP}.log &
+        wait $PID_NONMARKOV_SIGTRANS 2>/dev/null || true
+        PID_NONMARKOV_SIGTRANS_FULL=$!
+    else
+        echo "  [SKIP] $CKPT_NONMARKOV_SIGTRANS_FULL"
+        PID_NONMARKOV_SIGTRANS_FULL=""
+    fi
+
     # DART Transformer
     if [ -f "$CKPT_DART" ]; then
-        echo "[6] Sampling from DART Transformer (CFG=1.5)..."
+        echo "[8] Sampling from DART Transformer (CFG=1.5)..."
         CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_dart.sh \
             "$CKPT_DART" "experiments/dart_cifar10/samples/final_${STEP}.png" \
             "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 5 dart 1.0 1.5 &> logs/sample_dart_cifar10_${STEP}.log &
-        wait $PID_NONMARKOV_SIG_BALANCED 2>/dev/null || true
+        wait $PID_NONMARKOV_SIGTRANS_FULL 2>/dev/null || true
         PID_DART=$!
     else
         echo "  [SKIP] $CKPT_DART"
@@ -222,7 +280,7 @@ elif [ "$DATASET" == "cifar10" ]; then
 
     # DART Signature
     if [ -f "$CKPT_DART_SIG" ]; then
-        echo "[7] Sampling from DART Signature (CFG=1.5)..."
+        echo "[9] Sampling from DART Signature (CFG=1.5)..."
         CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_dart.sh \
             "$CKPT_DART_SIG" "experiments/dart_signature_cifar10/samples/final_${STEP}.png" \
             "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 5 dart 1.0 1.5 &> logs/sample_dart_sig_cifar10_${STEP}.log &
@@ -232,8 +290,34 @@ elif [ "$DATASET" == "cifar10" ]; then
         echo "  [SKIP] $CKPT_DART_SIG"
         PID_DART_SIG=""
     fi
+
+    # DART SignatureTransformer (lowmem)
+    if [ -f "$CKPT_DART_SIGTRANS" ]; then
+        echo "[10] Sampling from DART SignatureTransformer (lowmem, CFG=1.5)..."
+        CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_dart.sh \
+            "$CKPT_DART_SIGTRANS" "experiments/dart_signature_trans_cifar10_lowmem/samples/final_${STEP}.png" \
+            "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 5 dart 1.0 1.5 &> logs/sample_dart_sigtrans_lowmem_cifar10_${STEP}.log &
+        wait $PID_DART_SIG 2>/dev/null || true
+        PID_DART_SIGTRANS=$!
+    else
+        echo "  [SKIP] $CKPT_DART_SIGTRANS"
+        PID_DART_SIGTRANS=""
+    fi
+
+    # DART SignatureTransformer (full)
+    if [ -f "$CKPT_DART_SIGTRANS_FULL" ]; then
+        echo "[11] Sampling from DART SignatureTransformer (full, CFG=1.5)..."
+        CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_dart.sh \
+            "$CKPT_DART_SIGTRANS_FULL" "experiments/dart_signature_trans_cifar10_full/samples/final_${STEP}.png" \
+            "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 10 dart 1.0 1.5 &> logs/sample_dart_sigtrans_full_cifar10_${STEP}.log &
+        wait $PID_DART_SIGTRANS 2>/dev/null || true
+        PID_DART_SIGTRANS_FULL=$!
+    else
+        echo "  [SKIP] $CKPT_DART_SIGTRANS_FULL"
+        PID_DART_SIGTRANS_FULL=""
+    fi
     
-    wait $PID_DART_SIG 2>/dev/null || true
+    wait $PID_DART_SIGTRANS_FULL 2>/dev/null || true
 
 fi
 
