@@ -29,7 +29,7 @@ run_experiment() {
     echo "  Log: $logfile"
     
     # Run with nohup and capture PID (set PYTHONPATH to find nmsd module)
-    CUDA_VISIBLE_DEVICES=$GPU PYTHONPATH=$PROJECT_ROOT/src:$PYTHONPATH nohup python -m nmsd.training.$script "$config" &> "$logfile" &
+    PYTHONPATH="${PYTHONPATH:-}:$PROJECT_ROOT/src" CUDA_VISIBLE_DEVICES=$GPU nohup python -m nmsd.training.$script "$config" &> "$logfile" &
     local pid=$!
     
     echo "  PID: $pid"

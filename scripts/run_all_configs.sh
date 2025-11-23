@@ -27,44 +27,44 @@ NAMES=()
 
 # Core experiments (always run)
 if [[ "$MODE" == "all" ]] || [[ "$MODE" == "core" ]]; then
-    echo "[GPU $GPU_MARKOV] Starting Markov DDIM training..."
-    CUDA_VISIBLE_DEVICES=$GPU_MARKOV nohup bash scripts/train_markov.sh configs/markov_mnist.yaml &> logs/train_markov.log &
+    # Run with nohup and capture PID (set PYTHONPATH to find nmsd module)
+    PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src" CUDA_VISIBLE_DEVICES=$GPU_MARKOV nohup bash scripts/train_markov.sh configs/markov_mnist.yaml &> logs/train_markov.log &
     PIDS+=($!)
     NAMES+=("Markov")
 
-    echo "[GPU $GPU_NONMARKOV_EPS] Starting Non-Markov (epsilon, Transformer) training..."
-    CUDA_VISIBLE_DEVICES=$GPU_NONMARKOV_EPS nohup bash scripts/train_nonmarkov.sh configs/nonmarkov_mnist.yaml &> logs/train_nonmarkov_eps.log &
+    # Run with nohup and capture PID (set PYTHONPATH to find nmsd module)
+    PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src" CUDA_VISIBLE_DEVICES=$GPU_NONMARKOV_EPS nohup bash scripts/train_nonmarkov.sh configs/nonmarkov_mnist.yaml &> logs/train_nonmarkov_eps.log &
     PIDS+=($!)
     NAMES+=("Non-Markov(ε,Transformer)")
 
-    echo "[GPU $GPU_NONMARKOV_X0] Starting Non-Markov (x0, uniform, Transformer) training..."
-    CUDA_VISIBLE_DEVICES=$GPU_NONMARKOV_X0 nohup bash scripts/train_nonmarkov.sh configs/nonmarkov_mnist_x0.yaml &> logs/train_nonmarkov_x0.log &
+    # Run with nohup and capture PID (set PYTHONPATH to find nmsd module)
+    PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src" CUDA_VISIBLE_DEVICES=$GPU_NONMARKOV_X0 nohup bash scripts/train_nonmarkov.sh configs/nonmarkov_mnist_x0.yaml &> logs/train_nonmarkov_x0.log &
     PIDS+=($!)
     NAMES+=("Non-Markov(x₀,Transformer)")
 
-    echo "[GPU $GPU_DART] Starting DART (x0, SNR, CFG, Transformer) training..."
-    CUDA_VISIBLE_DEVICES=$GPU_DART nohup bash scripts/train_dart.sh configs/dart_mnist.yaml &> logs/train_dart.log &
+    # Run with nohup and capture PID (set PYTHONPATH to find nmsd module)
+    PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src" CUDA_VISIBLE_DEVICES=$GPU_DART nohup bash scripts/train_dart.sh configs/dart_mnist.yaml &> logs/train_dart.log &
     PIDS+=($!)
     NAMES+=("DART(Transformer,CFG)")
 fi
 
 # Signature experiments
 if [[ "$MODE" == "all" ]] || [[ "$MODE" == "signature" ]]; then
-    echo "[GPU $GPU_NONMARKOV_SIG] Starting Non-Markov (epsilon, Signature) training..."
-    CUDA_VISIBLE_DEVICES=$GPU_NONMARKOV_SIG nohup bash scripts/train_nonmarkov.sh configs/nonmarkov_mnist_signature.yaml &> logs/train_nonmarkov_sig.log &
+    # Run with nohup and capture PID (set PYTHONPATH to find nmsd module)
+    PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src" CUDA_VISIBLE_DEVICES=$GPU_NONMARKOV_SIG nohup bash scripts/train_nonmarkov.sh configs/nonmarkov_mnist_signature.yaml &> logs/train_nonmarkov_sig.log &
     PIDS+=($!)
     NAMES+=("Non-Markov(ε,Signature)")
 
-    echo "[GPU $GPU_DART_SIG] Starting DART (x0, SNR, CFG, Signature) training..."
-    CUDA_VISIBLE_DEVICES=$GPU_DART_SIG nohup bash scripts/train_dart.sh configs/dart_mnist_signature.yaml &> logs/train_dart_sig.log &
+    # Run with nohup and capture PID (set PYTHONPATH to find nmsd module)
+    PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src" CUDA_VISIBLE_DEVICES=$GPU_DART_SIG nohup bash scripts/train_dart.sh configs/dart_mnist_signature.yaml &> logs/train_dart_sig.log &
     PIDS+=($!)
     NAMES+=("DART(Signature,CFG)")
 fi
 
 # Optional: DART without CFG (ablation)
 if [[ "$MODE" == "all" ]]; then
-    echo "[GPU $GPU_DART_NO_CFG] Starting DART (no CFG) training..."
-    CUDA_VISIBLE_DEVICES=$GPU_DART_NO_CFG nohup bash scripts/train_dart.sh configs/dart_mnist_no_cfg.yaml &> logs/train_dart_no_cfg.log &
+    # Run with nohup and capture PID (set PYTHONPATH to find nmsd module)
+    PYTHONPATH="${PYTHONPATH:-}:$(pwd)/src" CUDA_VISIBLE_DEVICES=$GPU_DART_NO_CFG nohup bash scripts/train_dart.sh configs/dart_mnist_no_cfg.yaml &> logs/train_dart_no_cfg.log &
     PIDS+=($!)
     NAMES+=("DART(Transformer,no-CFG)")
 fi

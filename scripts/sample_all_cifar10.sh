@@ -65,7 +65,7 @@ sample_model() {
     
     echo "  Running: $script_cmd"
     # Execute the command with PYTHONPATH set
-    PYTHONPATH=$PROJECT_ROOT/src:$PYTHONPATH $script_cmd
+    PYTHONPATH="${PYTHONPATH:-}:$PROJECT_ROOT/src" $script_cmd
     
     echo ""
 }

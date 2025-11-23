@@ -94,7 +94,7 @@ evaluate_model() {
     fi
     
     # Run evaluation
-    CUDA_VISIBLE_DEVICES=$GPU PYTHONPATH=$PROJECT_ROOT/src:$PYTHONPATH python -m nmsd.evaluation.evaluate \
+    CUDA_VISIBLE_DEVICES=$GPU PYTHONPATH="${PYTHONPATH:-}:$PROJECT_ROOT/src" python -m nmsd.evaluation.evaluate \
         --config "$config" \
         --checkpoint "$closest_checkpoint" \
         --num-samples $NUM_SAMPLES \
