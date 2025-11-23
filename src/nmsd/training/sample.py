@@ -6,9 +6,9 @@ from pathlib import Path
 import torch
 from torchvision.utils import save_image
 
-from nmsd.models.unet import UNet
-from nmsd.diffusion.schedulers import build_schedule
-from nmsd.diffusion.sampler import ddim_sample_loop
+from ..models.unet import UNet
+from ..diffusion.schedulers import build_schedule
+from ..diffusion.sampler import ddim_sample_loop
 
 
 @torch.no_grad()

@@ -12,12 +12,12 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from nmsd.diffusion.schedulers import build_schedule
-from nmsd.diffusion.losses import ddpm_simple_loss
-from nmsd.data.datasets import get_dataloaders
-from nmsd.models.unet import UNet
-from nmsd.diffusion.sampler import ddim_sample_loop
-from nmsd.utils.logger import LossLogger, MemoryProfiler
+from ..diffusion.schedulers import build_schedule
+from ..diffusion.losses import ddpm_simple_loss
+from ..data.datasets import get_dataloaders
+from ..models.unet import UNet
+from ..diffusion.sampler import ddim_sample_loop
+from ..utils.logger import LossLogger, MemoryProfiler
 
 
 def set_seed(seed: int):

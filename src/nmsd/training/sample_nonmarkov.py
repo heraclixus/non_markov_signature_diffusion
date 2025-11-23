@@ -6,11 +6,11 @@ from pathlib import Path
 import torch
 from torchvision.utils import save_image
 
-from nmsd.models.unet_context import ContextUNet
-from nmsd.encoders.transformer_context import SuffixTransformerEncoder
-from nmsd.encoders.signature import SignatureEncoder, SignatureTransformerEncoder
-from nmsd.diffusion.schedulers import build_schedule
-from nmsd.diffusion.sampler import nonmarkov_ddim_sample_loop, efficient_nonmarkov_sample_loop
+from ..models.unet_context import ContextUNet
+from ..encoders.transformer_context import SuffixTransformerEncoder
+from ..encoders.signature import SignatureEncoder, SignatureTransformerEncoder
+from ..diffusion.schedulers import build_schedule
+from ..diffusion.sampler import nonmarkov_ddim_sample_loop, efficient_nonmarkov_sample_loop
 
 
 @torch.no_grad()

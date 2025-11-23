@@ -17,12 +17,12 @@ from pathlib import Path
 import torch
 import yaml
 
-from nmsd.diffusion.schedulers import build_schedule
-from nmsd.models.unet import UNet
-from nmsd.models.unet_context import ContextUNet
-from nmsd.encoders.transformer_context import SuffixTransformerEncoder
-from nmsd.encoders.signature import SignatureEncoder, SignatureTransformerEncoder
-from nmsd.evaluation.metrics import evaluate_model
+from ..diffusion.schedulers import build_schedule
+from ..models.unet import UNet
+from ..models.unet_context import ContextUNet
+from ..encoders.transformer_context import SuffixTransformerEncoder
+from ..encoders.signature import SignatureEncoder, SignatureTransformerEncoder
+from ..evaluation.metrics import evaluate_model
 
 
 def load_model_from_checkpoint(config_path: Path, checkpoint_path: Path, device: str):

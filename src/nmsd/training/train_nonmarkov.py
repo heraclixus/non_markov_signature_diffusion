@@ -12,14 +12,14 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from nmsd.diffusion.schedulers import build_schedule
-from nmsd.diffusion.losses import nonmarkov_suffix_loss, dart_loss
-from nmsd.data.datasets import get_dataloaders
-from nmsd.models.unet_context import ContextUNet
-from nmsd.encoders.transformer_context import SuffixTransformerEncoder
-from nmsd.encoders.signature import SignatureEncoder, SignatureTransformerEncoder
-from nmsd.diffusion.sampler import nonmarkov_ddim_sample_loop, efficient_nonmarkov_sample_loop
-from nmsd.utils.logger import LossLogger, MemoryProfiler
+from ..diffusion.schedulers import build_schedule
+from ..diffusion.losses import nonmarkov_suffix_loss, dart_loss
+from ..data.datasets import get_dataloaders
+from ..models.unet_context import ContextUNet
+from ..encoders.transformer_context import SuffixTransformerEncoder
+from ..encoders.signature import SignatureEncoder, SignatureTransformerEncoder
+from ..diffusion.sampler import nonmarkov_ddim_sample_loop, efficient_nonmarkov_sample_loop
+from ..utils.logger import LossLogger, MemoryProfiler
 
 
 def set_seed(seed: int):
