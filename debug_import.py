@@ -10,6 +10,16 @@ try:
     print("\nSuccessfully imported nmsd")
     print("nmsd file:", getattr(nmsd, '__file__', 'unknown'))
     print("nmsd path:", getattr(nmsd, '__path__', 'unknown'))
+    
+    # Debug directory contents
+    if hasattr(nmsd, '__file__'):
+        nmsd_dir = os.path.dirname(nmsd.__file__)
+        print(f"Contents of {nmsd_dir}:", os.listdir(nmsd_dir))
+        data_dir = os.path.join(nmsd_dir, "data")
+        if os.path.exists(data_dir):
+            print(f"Contents of {data_dir}:", os.listdir(data_dir))
+        else:
+            print(f"Directory {data_dir} does not exist")
 except ImportError as e:
     print("\nFailed to import nmsd:", e)
 
