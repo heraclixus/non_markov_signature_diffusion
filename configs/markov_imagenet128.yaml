@@ -1,0 +1,36 @@
+seed: 42
+
+data:
+  dataset: imagenet128
+  root: data/imagenet
+  batch_size: 16  # Reduced for larger images
+  num_workers: 4
+  image_size: 128
+
+diffusion:
+  T: 1000
+  schedule: cosine
+  cosine_s: 0.008
+
+model:
+  in_channels: 3
+  base_channels: 128
+  channel_mults: [1, 1, 2, 3, 4]  # Adapted for 128x128
+  num_res_blocks: 2
+  time_emb_dim: 512
+  dropout: 0.1
+
+training:
+  epochs: 100
+  lr: 1.0e-4
+  weight_decay: 0.0
+  log_every: 100
+  sample_every_steps: 2000
+  save_every_steps: 5000
+  out_dir: experiments/markov_ddim_imagenet128
+  ema_decay: 0.9999
+
+sampling:
+  num_steps: 50
+  eta: 0.0
+
