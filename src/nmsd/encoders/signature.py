@@ -15,34 +15,46 @@ import pysiglib.torch_api as pysiglib
 def _patch_pysiglib():
     try:
         func = pysiglib.signature
-        # Look for the hidden Autograd class in the closure of the wrapper function
-        if hasattr(func, "__closure__") and func.__closure__:
+        SigClass = None
+        
+        # Method 1: Check function globals (most likely for a class used in the function)
+        if hasattr(func, "__globals__") and "Signature" in func.__globals__:
+            SigClass = func.__globals__["Signature"]
+            
+        # Method 2: Check closure (in case it was captured)
+        elif hasattr(func, "__closure__") and func.__closure__:
             for cell in func.__closure__:
                 content = cell.cell_contents
                 if isinstance(content, type) and issubclass(content, torch.autograd.Function):
                     SigClass = content
-                    
-                    # Only patch if we can access the backward method
-                    if hasattr(SigClass, 'backward'):
-                        original_backward = SigClass.backward
-                        
-                        # Check if already patched to avoid recursion
-                        if getattr(original_backward, "_is_patched", False):
-                            return
+                    break
+        
+        # Method 3: Check module directly
+        elif hasattr(pysiglib, "Signature"):
+             SigClass = getattr(pysiglib, "Signature")
 
-                        @staticmethod
-                        def patched_backward(ctx, grad_output):
-                            grads = original_backward(ctx, grad_output)
-                            # Fix for "expected 7, got 6" error
-                            if isinstance(grads, tuple) and len(grads) == 6:
-                                # Append None for the missing 7th argument
-                                return grads + (None,)
-                            return grads
-                        
-                        patched_backward._is_patched = True
-                        SigClass.backward = patched_backward
-                        print(f"Pysiglib patched: {SigClass.__name__}.backward wrapped to fix gradient count (6->7).")
-                        return True
+        if SigClass and issubclass(SigClass, torch.autograd.Function):
+            # Only patch if we can access the backward method
+            if hasattr(SigClass, 'backward'):
+                original_backward = SigClass.backward
+                
+                # Check if already patched to avoid recursion
+                if getattr(original_backward, "_is_patched", False):
+                    return
+
+                @staticmethod
+                def patched_backward(ctx, grad_output):
+                    grads = original_backward(ctx, grad_output)
+                    # Fix for "expected 7, got 6" error
+                    if isinstance(grads, tuple) and len(grads) == 6:
+                        # Append None for the missing 7th argument
+                        return grads + (None,)
+                    return grads
+                
+                patched_backward._is_patched = True
+                SigClass.backward = patched_backward
+                print(f"Pysiglib patched: {SigClass.__name__}.backward wrapped to fix gradient count (6->7).")
+                return True
     except Exception as e:
         print(f"Warning: Failed to attempt pysiglib patch: {e}")
     return False
