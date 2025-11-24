@@ -17,7 +17,7 @@ from ..diffusion.losses import nonmarkov_suffix_loss, dart_loss
 from ..data.datasets import get_dataloaders
 from ..models.unet_context import ContextUNet
 from ..encoders.transformer_context import SuffixTransformerEncoder
-from ..encoders.signature import SignatureEncoder, SignatureTransformerEncoder
+from ..encoders.signature import SignatureEncoder, SignatureTransformerEncoder, SignatureLinearEncoder
 from ..diffusion.sampler import nonmarkov_ddim_sample_loop, efficient_nonmarkov_sample_loop
 from ..utils.logger import LossLogger, MemoryProfiler
 
@@ -93,6 +93,17 @@ def train(cfg: Dict):
     
     if encoder_type == "signature":
         encoder = SignatureEncoder(
+            image_channels=int(cfg["model"]["in_channels"]),
+            image_size=int(cfg["data"]["image_size"]),
+            context_dim=int(cfg["model"]["context_dim"]),
+            signature_degree=int(cfg["encoder"].get("signature_degree", 3)),
+            pooling=cfg["encoder"].get("pooling", "spatial_mean"),
+            time_augment=cfg["encoder"].get("time_augment", True),
+            use_lead_lag=cfg["encoder"].get("use_lead_lag", False),
+            hidden_dim=int(cfg["encoder"].get("hidden_dim", 256)),
+        ).to(device)
+    elif encoder_type == "signature_linear":
+        encoder = SignatureLinearEncoder(
             image_channels=int(cfg["model"]["in_channels"]),
             image_size=int(cfg["data"]["image_size"]),
             context_dim=int(cfg["model"]["context_dim"]),
@@ -249,6 +260,17 @@ def train(cfg: Dict):
                         use_lead_lag=cfg["encoder"].get("use_lead_lag", False),
                         hidden_dim=int(cfg["encoder"].get("hidden_dim", 256)),
                     ).to(device)
+                elif encoder_type == "signature_linear":
+                    ema_encoder_copy = SignatureLinearEncoder(
+                        image_channels=int(cfg["model"]["in_channels"]),
+                        image_size=int(cfg["data"]["image_size"]),
+                        context_dim=int(cfg["model"]["context_dim"]),
+                        signature_degree=int(cfg["encoder"].get("signature_degree", 3)),
+                        pooling=cfg["encoder"].get("pooling", "spatial_mean"),
+                        time_augment=cfg["encoder"].get("time_augment", True),
+                        use_lead_lag=cfg["encoder"].get("use_lead_lag", False),
+                        hidden_dim=int(cfg["encoder"].get("hidden_dim", 256)),
+                    ).to(device)
                 elif encoder_type == "signature_trans":
                     # Hybrid: signature spatial features + transformer temporal modeling
                     ema_encoder_copy = SignatureTransformerEncoder(
@@ -283,7 +305,7 @@ def train(cfg: Dict):
                     pred_type = "x0" if loss_type == "dart" else "epsilon"
                     
                     # Use efficient sampler for signature encoder if possible
-                    if encoder_type == "signature":
+                    if encoder_type in ["signature", "signature_linear"]:
                         samples = efficient_nonmarkov_sample_loop(
                             ema_model_copy,
                             ema_encoder_copy,

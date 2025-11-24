@@ -1,0 +1,49 @@
+seed: 42
+
+data:
+  dataset: mnist
+  root: data
+  batch_size: 128
+  num_workers: 4
+  image_size: 28
+
+diffusion:
+  T: 1000
+  schedule: cosine
+  cosine_s: 0.008
+  num_suffix_steps: 10  # Number of future timesteps in suffix
+
+model:
+  in_channels: 1
+  base_channels: 64
+  channel_mults: [1, 2, 4]
+  num_res_blocks: 2
+  time_emb_dim: 256
+  context_dim: 256  # Dimension of suffix context embedding
+
+encoder:
+  type: signature_linear  # 'transformer' or 'signature' or 'signature_linear'
+  # Signature encoder params
+  signature_degree: 2  # Truncation level (2-4 typical)
+  pooling: spatial_mean  # 'spatial_mean', 'flatten', 'conv_pool'
+  time_augment: true  # Add time as an extra channel
+  use_lead_lag: false  # Lead-lag transformation
+  hidden_dim: 256
+
+training:
+  epochs: 47  # ~22K steps (60K/128 = 469 steps/epoch, 47*469 ≈ 22K steps)
+  lr: 2.0e-4
+  weight_decay: 0.0
+  log_every: 100
+  sample_every_steps: 1000
+  save_every_steps: 2000
+  out_dir: experiments/nonmarkov_signature_linear
+  ema_decay: 0.999
+  loss_type: epsilon  # Epsilon prediction with signature encoding
+  weighting: none
+  use_cfg: false
+  context_dropout: 0.0
+
+sampling:
+  cfg_scale: 0.0  # No CFG
+

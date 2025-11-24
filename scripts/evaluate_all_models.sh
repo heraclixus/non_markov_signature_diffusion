@@ -121,6 +121,8 @@ if [ "$DATASET" == "mnist" ]; then
     evaluate_model "configs/dart_mnist.yaml" "experiments/dart" "dart_transformer_mnist"
     evaluate_model "configs/dart_mnist_signature.yaml" "experiments/dart_signature" "dart_signature_mnist"
     evaluate_model "configs/dart_mnist_signature_trans.yaml" "experiments/dart_signature_trans" "dart_signature_trans_mnist"
+    evaluate_model "configs/nonmarkov_mnist_signature_linear.yaml" "experiments/nonmarkov_signature_linear" "nonmarkov_signature_linear_mnist"
+    evaluate_model "configs/dart_mnist_signature_linear.yaml" "experiments/dart_signature_linear" "dart_signature_linear_mnist"
     
 elif [ "$DATASET" == "cifar10" ]; then
     # CIFAR-10 Models
@@ -134,6 +136,8 @@ elif [ "$DATASET" == "cifar10" ]; then
     evaluate_model "configs/dart_cifar10_signature.yaml" "experiments/dart_signature_cifar10" "dart_signature_cifar10"
     evaluate_model "configs/dart_cifar10_signature_trans.yaml" "experiments/dart_signature_trans_cifar10_lowmem" "dart_signature_trans_cifar10_lowmem"
     evaluate_model "configs/dart_cifar10_signature_trans_full.yaml" "experiments/dart_signature_trans_cifar10_full" "dart_signature_trans_cifar10_full"
+    evaluate_model "configs/nonmarkov_cifar10_signature_linear.yaml" "experiments/nonmarkov_signature_linear_cifar10" "nonmarkov_signature_linear_cifar10"
+    evaluate_model "configs/dart_cifar10_signature_linear.yaml" "experiments/dart_signature_linear_cifar10" "dart_signature_linear_cifar10"
     
 else
     echo "Error: Unknown dataset '$DATASET'"

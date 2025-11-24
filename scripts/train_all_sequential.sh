@@ -68,6 +68,9 @@ train_model "configs/dart_mnist.yaml" "train_dart" "mnist_dart_transformer"
 # MNIST - DART Signature
 train_model "configs/dart_mnist_signature.yaml" "train_dart" "mnist_dart_signature"
 
+# MNIST - DART SignatureLinear
+train_model "configs/dart_mnist_signature_linear.yaml" "train_dart" "mnist_dart_signature_linear"
+
 echo "=========================================="
 echo "CIFAR-10 MODELS (~155K steps each)"
 echo "=========================================="
@@ -87,6 +90,9 @@ train_model "configs/dart_cifar10.yaml" "train_dart" "cifar10_dart_transformer"
 
 # CIFAR-10 - DART Signature
 train_model "configs/dart_cifar10_signature.yaml" "train_dart" "cifar10_dart_signature"
+
+# CIFAR-10 - DART SignatureLinear
+train_model "configs/dart_cifar10_signature_linear.yaml" "train_dart" "cifar10_dart_signature_linear"
 
 # Summary
 end_time=$(date +%s)

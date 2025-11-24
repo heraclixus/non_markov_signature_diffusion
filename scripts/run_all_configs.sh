@@ -19,11 +19,12 @@ GPU_NONMARKOV_EPS=1
 GPU_NONMARKOV_X0=2
 GPU_DART=3
 GPU_NONMARKOV_SIG=4
-GPU_DART_SIG=5
-GPU_DART_NO_CFG=6
-
-PIDS=()
-NAMES=()
+    GPU_DART_SIG=5
+    GPU_DART_NO_CFG=6
+    GPU_SIG_LINEAR=7
+    
+    PIDS=()
+    NAMES=()
 
 # Core experiments (always run)
 if [[ "$MODE" == "all" ]] || [[ "$MODE" == "core" ]]; then
@@ -59,6 +60,11 @@ if [[ "$MODE" == "all" ]] || [[ "$MODE" == "signature" ]]; then
     PYTHONPATH="$PROJECT_ROOT/src:${PYTHONPATH:-}" CUDA_VISIBLE_DEVICES=$GPU_DART_SIG nohup bash scripts/train_dart.sh configs/dart_mnist_signature.yaml &> logs/train_dart_sig.log &
     PIDS+=($!)
     NAMES+=("DART(Signature,CFG)")
+
+    # Run with nohup and capture PID (set PYTHONPATH to find nmsd module)
+    PYTHONPATH="$PROJECT_ROOT/src:${PYTHONPATH:-}" CUDA_VISIBLE_DEVICES=$GPU_SIG_LINEAR nohup bash scripts/train_dart.sh configs/dart_mnist_signature_linear.yaml &> logs/train_dart_sig_linear.log &
+    PIDS+=($!)
+    NAMES+=("DART(Signature-Linear,CFG)")
 fi
 
 # Optional: DART without CFG (ablation)
@@ -80,8 +86,8 @@ done
 echo ""
 echo "Mode: $MODE"
 echo "  'core' = 4 core experiments (GPUs 0-3)"
-echo "  'signature' = 2 signature experiments (GPUs 4-5)"
-echo "  'all' = 7 experiments including ablations (GPUs 0-6)"
+echo "  'signature' = 3 signature experiments (GPUs 4,5,7)"
+echo "  'all' = 8 experiments including ablations (GPUs 0-7)"
 echo ""
 echo "Monitor training:"
 echo "  tail -f logs/train_*.log"

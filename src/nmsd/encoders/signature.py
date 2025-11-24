@@ -420,6 +420,46 @@ class LogSignatureEncoder(nn.Module):
         return self.signature_encoder.get_empty_signature(*args, **kwargs)
 
 
+class SignatureLinearEncoder(SignatureEncoder):
+    """
+    Signature encoder with a linear projection.
+    
+    This model implements: Context -> Signature Transform -> Learnable Linear Weight.
+    It leverages the universal approximation property of linear functionals of the signature
+    to encode the path context. Unlike SignatureEncoder which uses an MLP, this uses a
+    single linear transformation.
+    """
+    
+    def __init__(
+        self,
+        image_channels: int = 1,
+        image_size: int = 28,
+        context_dim: int = 256,
+        signature_degree: int = 2,
+        pooling: str = "spatial_mean",
+        time_augment: bool = True,
+        use_lead_lag: bool = False,
+        hidden_dim: int = 256,
+    ):
+        super().__init__(
+            image_channels=image_channels,
+            image_size=image_size,
+            context_dim=context_dim,
+            signature_degree=signature_degree,
+            pooling=pooling,
+            time_augment=time_augment,
+            use_lead_lag=use_lead_lag,
+            hidden_dim=hidden_dim,
+        )
+        
+        # Replace MLP with single Linear layer
+        # "linear functional of signature"
+        self.sig_proj = nn.Linear(self.sig_dim, context_dim)
+        
+        print(f"SignatureLinearEncoder: Linear projection (sig_dim={self.sig_dim} -> context_dim={context_dim})")
+
+
+
 
 class SinusoidalPosEmb(nn.Module):
     """Sinusoidal positional embeddings for timesteps."""

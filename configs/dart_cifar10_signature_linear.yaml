@@ -1,0 +1,49 @@
+seed: 42
+
+data:
+  dataset: cifar10
+  root: data
+  batch_size: 64  # Reduced batch size for non-Markov DART
+  num_workers: 4
+  image_size: 32
+
+diffusion:
+  T: 1000
+  schedule: cosine
+  cosine_s: 0.008
+  num_suffix_steps: 10  # Number of future timesteps in suffix
+
+model:
+  in_channels: 3  # RGB images
+  base_channels: 128  # Increased for more complex dataset
+  channel_mults: [1, 2, 2, 2]
+  num_res_blocks: 2
+  time_emb_dim: 512
+  context_dim: 512  # Dimension of suffix context embedding
+
+encoder:
+  type: signature_linear  # 'transformer' or 'signature' or 'signature_linear'
+  # Signature encoder params
+  signature_degree: 2  # Truncation level (2-4 typical)
+  pooling: conv_pool  # 'spatial_mean', 'flatten', 'conv_pool' (conv_pool recommended for RGB)
+  time_augment: true  # Add time as an extra channel
+  use_lead_lag: false  # Lead-lag transformation
+  hidden_dim: 512
+
+training:
+  epochs: 100  # ~40K steps (50K/64 = 781 steps/epoch, 50*781 ≈ 39K steps)
+  lr: 2.0e-4
+  weight_decay: 0.0
+  log_every: 100
+  sample_every_steps: 1000
+  save_every_steps: 5000
+  out_dir: experiments/dart_signature_linear_cifar10
+  ema_decay: 0.9999
+  loss_type: dart  # DART loss with signature encoding
+  weighting: snr_sum  # DART weighting
+  use_cfg: true  # Enable CFG for DART
+  context_dropout: 0.1  # 10% dropout for classifier-free guidance
+
+sampling:
+  cfg_scale: 1.5  # CFG scale for DART sampling
+

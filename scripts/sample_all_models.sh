@@ -33,6 +33,8 @@ if [ "$DATASET" == "mnist" ]; then
     CKPT_DART_SIG="experiments/dart_signature/checkpoints/model_${STEP}.pt"
     CKPT_DART_SIGTRANS="experiments/dart_signature_trans/checkpoints/model_${STEP}.pt"
     CKPT_DART_NO_CFG="experiments/dart_no_cfg/checkpoints/model_${STEP}.pt"
+    CKPT_NONMARKOV_SIGLINEAR="experiments/nonmarkov_signature_linear/checkpoints/model_${STEP}.pt"
+    CKPT_DART_SIGLINEAR="experiments/dart_signature_linear/checkpoints/model_${STEP}.pt"
 elif [ "$DATASET" == "cifar10" ]; then
     CKPT_MARKOV="experiments/markov_ddim_cifar10/checkpoints/model_${STEP}.pt"
     CKPT_NONMARKOV_TRANS="experiments/nonmarkov_ddim_cifar10/checkpoints/model_${STEP}.pt"
@@ -45,6 +47,8 @@ elif [ "$DATASET" == "cifar10" ]; then
     CKPT_DART_SIG="experiments/dart_signature_cifar10/checkpoints/model_${STEP}.pt"
     CKPT_DART_SIGTRANS="experiments/dart_signature_trans_cifar10_lowmem/checkpoints/model_${STEP}.pt"
     CKPT_DART_SIGTRANS_FULL="experiments/dart_signature_trans_cifar10_full/checkpoints/model_${STEP}.pt"
+    CKPT_NONMARKOV_SIGLINEAR="experiments/nonmarkov_signature_linear_cifar10/checkpoints/model_${STEP}.pt"
+    CKPT_DART_SIGLINEAR="experiments/dart_signature_linear_cifar10/checkpoints/model_${STEP}.pt"
 else
     echo "Error: Unknown dataset '$DATASET'"
     echo "Usage: bash scripts/sample_all_models.sh <mnist|cifar10> [step] [num_samples] [ddim_steps]"
@@ -170,7 +174,33 @@ if [ "$DATASET" == "mnist" ]; then
         PID_DART_NO_CFG=""
     fi
     
-    wait $PID_DART_NO_CFG 2>/dev/null || true
+    # Non-Markov SignatureLinear
+    if [ -f "$CKPT_NONMARKOV_SIGLINEAR" ]; then
+        echo "[10] Sampling from Non-Markov SignatureLinear..."
+        CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_nonmarkov.sh \
+            "$CKPT_NONMARKOV_SIGLINEAR" "experiments/nonmarkov_signature_linear/samples/final_${STEP}.png" \
+            "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 5 0.0 &> logs/sample_nonmarkov_siglinear_${STEP}.log &
+        wait $PID_DART_NO_CFG 2>/dev/null || true
+        PID_NONMARKOV_SIGLINEAR=$!
+    else
+        echo "  [SKIP] $CKPT_NONMARKOV_SIGLINEAR"
+        PID_NONMARKOV_SIGLINEAR=""
+    fi
+
+    # DART SignatureLinear
+    if [ -f "$CKPT_DART_SIGLINEAR" ]; then
+        echo "[11] Sampling from DART SignatureLinear (CFG=1.5)..."
+        CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_dart.sh \
+            "$CKPT_DART_SIGLINEAR" "experiments/dart_signature_linear/samples/final_${STEP}.png" \
+            "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 5 dart 1.0 1.5 &> logs/sample_dart_siglinear_${STEP}.log &
+        wait $PID_NONMARKOV_SIGLINEAR 2>/dev/null || true
+        PID_DART_SIGLINEAR=$!
+    else
+        echo "  [SKIP] $CKPT_DART_SIGLINEAR"
+        PID_DART_SIGLINEAR=""
+    fi
+    
+    wait $PID_DART_SIGLINEAR 2>/dev/null || true
 
 elif [ "$DATASET" == "cifar10" ]; then
     # CIFAR-10 Models
@@ -317,7 +347,33 @@ elif [ "$DATASET" == "cifar10" ]; then
         PID_DART_SIGTRANS_FULL=""
     fi
     
-    wait $PID_DART_SIGTRANS_FULL 2>/dev/null || true
+    # Non-Markov SignatureLinear
+    if [ -f "$CKPT_NONMARKOV_SIGLINEAR" ]; then
+        echo "[12] Sampling from Non-Markov SignatureLinear..."
+        CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_nonmarkov.sh \
+            "$CKPT_NONMARKOV_SIGLINEAR" "experiments/nonmarkov_signature_linear_cifar10/samples/final_${STEP}.png" \
+            "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 5 0.0 &> logs/sample_nonmarkov_siglinear_cifar10_${STEP}.log &
+        wait $PID_DART_SIGTRANS_FULL 2>/dev/null || true
+        PID_NONMARKOV_SIGLINEAR=$!
+    else
+        echo "  [SKIP] $CKPT_NONMARKOV_SIGLINEAR"
+        PID_NONMARKOV_SIGLINEAR=""
+    fi
+
+    # DART SignatureLinear
+    if [ -f "$CKPT_DART_SIGLINEAR" ]; then
+        echo "[13] Sampling from DART SignatureLinear (CFG=1.5)..."
+        CUDA_VISIBLE_DEVICES=0 nohup bash scripts/sample_dart.sh \
+            "$CKPT_DART_SIGLINEAR" "experiments/dart_signature_linear_cifar10/samples/final_${STEP}.png" \
+            "$NUM_SAMPLES" "$NUM_DDIM_STEPS" 5 dart 1.0 1.5 &> logs/sample_dart_siglinear_cifar10_${STEP}.log &
+        wait $PID_NONMARKOV_SIGLINEAR 2>/dev/null || true
+        PID_DART_SIGLINEAR=$!
+    else
+        echo "  [SKIP] $CKPT_DART_SIGLINEAR"
+        PID_DART_SIGLINEAR=""
+    fi
+    
+    wait $PID_DART_SIGLINEAR 2>/dev/null || true
 
 fi
 
@@ -339,5 +395,6 @@ elif [ "$DATASET" == "cifar10" ]; then
     echo "  open experiments/nonmarkov_signature_cifar10_lowmem/samples/final_${STEP}.png"
     echo "  open experiments/nonmarkov_signature_cifar10_balanced/samples/final_${STEP}.png"
     echo "  open experiments/dart_cifar10/samples/final_${STEP}.png"
+    echo "  open experiments/dart_signature_linear_cifar10/samples/final_${STEP}.png"
 fi
 

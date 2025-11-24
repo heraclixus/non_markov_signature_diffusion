@@ -79,8 +79,12 @@ echo "[7/8] DART Signature-Trans ImageNet64"
 run_experiment "configs/dart_imagenet64_signature_trans.yaml" "train_dart" "logs/train_dart_sig_trans_imagenet64.log" "DART(Signature-Trans)-ImageNet64"
 
 # 8. DART with Transformer -> Signature Encoder
-echo "[8/8] DART Trans-Signature ImageNet64"
+echo "[8/9] DART Trans-Signature ImageNet64"
 run_experiment "configs/dart_imagenet64_trans_signature.yaml" "train_dart" "logs/train_dart_trans_sig_imagenet64.log" "DART(Trans-Signature)-ImageNet64"
+
+# 9. DART with Signature Linear Encoder
+echo "[9/9] DART Signature Linear ImageNet64"
+run_experiment "configs/dart_imagenet64_signature_linear.yaml" "train_dart" "logs/train_dart_sig_linear_imagenet64.log" "DART(Signature-Linear)-ImageNet64"
 
 # Overall summary
 end_time=$(date +%s)
@@ -104,6 +108,7 @@ echo "  - experiments/dart_imagenet64/"
 echo "  - experiments/dart_signature_imagenet64/"
 echo "  - experiments/dart_signature_trans_imagenet64/"
 echo "  - experiments/dart_trans_signature_imagenet64/"
+echo "  - experiments/dart_signature_linear_imagenet64/"
 echo ""
 echo "Compare results:"
 echo "  python scripts/compare_losses.py"
