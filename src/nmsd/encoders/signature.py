@@ -8,6 +8,48 @@ import torch.nn as nn
 
 import pysiglib.torch_api as pysiglib
 
+# --- Patch for pysiglib gradient mismatch ---
+# The pysiglib.signature function seems to wrap an autograd.Function that
+# expects 7 arguments in forward but returns 6 gradients in backward.
+# We attempt to patch it here.
+def _patch_pysiglib():
+    try:
+        func = pysiglib.signature
+        # Look for the hidden Autograd class in the closure of the wrapper function
+        if hasattr(func, "__closure__") and func.__closure__:
+            for cell in func.__closure__:
+                content = cell.cell_contents
+                if isinstance(content, type) and issubclass(content, torch.autograd.Function):
+                    SigClass = content
+                    
+                    # Only patch if we can access the backward method
+                    if hasattr(SigClass, 'backward'):
+                        original_backward = SigClass.backward
+                        
+                        # Check if already patched to avoid recursion
+                        if getattr(original_backward, "_is_patched", False):
+                            return
+
+                        @staticmethod
+                        def patched_backward(ctx, grad_output):
+                            grads = original_backward(ctx, grad_output)
+                            # Fix for "expected 7, got 6" error
+                            if isinstance(grads, tuple) and len(grads) == 6:
+                                # Append None for the missing 7th argument
+                                return grads + (None,)
+                            return grads
+                        
+                        patched_backward._is_patched = True
+                        SigClass.backward = patched_backward
+                        print(f"Pysiglib patched: {SigClass.__name__}.backward wrapped to fix gradient count (6->7).")
+                        return True
+    except Exception as e:
+        print(f"Warning: Failed to attempt pysiglib patch: {e}")
+    return False
+
+_patch_pysiglib()
+# --------------------------------------------
+
 class SignatureEncoder(nn.Module):
     """
     Path signature encoder for suffix sequences x_{t:T}.
